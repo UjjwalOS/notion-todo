@@ -1,0 +1,159 @@
+import { useState } from 'react';
+import { usePages } from '@/hooks';
+import { PageTreeItem } from './PageTreeItem';
+import type { PageWithChildren } from '@/types';
+import { Plus, Loader2 } from 'lucide-react';
+
+interface RenameModalProps {
+  page: PageWithChildren;
+  onClose: () => void;
+  onSave: (id: string, title: string, icon: string | null) => void;
+}
+
+function RenameModal({ page, onClose, onSave }: RenameModalProps) {
+  const [title, setTitle] = useState(page.title);
+  const [icon, setIcon] = useState(page.icon || '');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(page.id, title, icon || null);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-sm rounded-lg bg-[var(--color-bg-primary)] p-4 shadow-xl">
+        <h3 className="mb-4 text-lg font-semibold text-[var(--color-text-primary)]">
+          Rename Page
+        </h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm text-[var(--color-text-secondary)]">
+              Icon (emoji)
+            </label>
+            <input
+              type="text"
+              value={icon}
+              onChange={(e) => setIcon(e.target.value)}
+              placeholder="📄"
+              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm"
+              maxLength={2}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-[var(--color-text-secondary)]">
+              Title
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-sm"
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm text-white hover:bg-[var(--color-accent-hover)]"
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export function PageTree() {
+  const { pageTree, isLoading, createPage, updatePage, deletePage } = usePages();
+  const [renamingPage, setRenamingPage] = useState<PageWithChildren | null>(null);
+
+  const handleCreatePage = async (parentId?: string | null) => {
+    await createPage({
+      title: 'Untitled',
+      parent_id: parentId || null,
+    });
+  };
+
+  const handleRename = async (id: string, title: string, icon: string | null) => {
+    await updatePage({ id, title, icon });
+  };
+
+  const handleDelete = async (page: PageWithChildren) => {
+    if (confirm(`Are you sure you want to delete "${page.title}"? This will also delete all subpages.`)) {
+      await deletePage(page.id);
+    }
+  };
+
+  const handleDuplicate = async (page: PageWithChildren) => {
+    await createPage({
+      title: `${page.title} (copy)`,
+      parent_id: page.parent_id,
+      icon: page.icon,
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 size={20} className="animate-spin text-[var(--color-text-tertiary)]" />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {pageTree.length === 0 ? (
+        <div className="px-2 py-4 text-center">
+          <p className="mb-3 text-sm text-[var(--color-text-tertiary)]">
+            No pages yet
+          </p>
+          <button
+            onClick={() => handleCreatePage()}
+            className="inline-flex items-center gap-1 rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-sm text-white hover:bg-[var(--color-accent-hover)]"
+          >
+            <Plus size={14} />
+            Create your first page
+          </button>
+        </div>
+      ) : (
+        <>
+          {pageTree.map((page) => (
+            <PageTreeItem
+              key={page.id}
+              page={page}
+              onCreateSubpage={(parentId) => handleCreatePage(parentId)}
+              onRename={setRenamingPage}
+              onDelete={handleDelete}
+              onDuplicate={handleDuplicate}
+            />
+          ))}
+          <button
+            onClick={() => handleCreatePage()}
+            className="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]"
+          >
+            <Plus size={14} />
+            Add page
+          </button>
+        </>
+      )}
+
+      {renamingPage && (
+        <RenameModal
+          page={renamingPage}
+          onClose={() => setRenamingPage(null)}
+          onSave={handleRename}
+        />
+      )}
+    </div>
+  );
+}
