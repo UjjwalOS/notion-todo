@@ -155,14 +155,14 @@ export function useColumns(pageId: string | null) {
     try {
       const defaultColumns = [
         { title: 'Inbox', color: '#e3e2e0', position: 0 },
-        { title: '/', color: '#9e9e9e', position: 1 },
+        { title: '--', color: '#9e9e9e', position: 1 },
         { title: '3', color: '#ef5350', position: 2 },
         { title: '2', color: '#ff9800', position: 3 },
         { title: '1', color: '#ffeb3b', position: 4 },
         { title: 'In Progress', color: '#f5a623', position: 5 },
-        { title: '/', color: '#9e9e9e', position: 6 },
+        { title: '--', color: '#9e9e9e', position: 6 },
         { title: 'Done', color: '#4caf50', position: 7 },
-        { title: 'Shared with Tense', color: '#7c4dff', position: 8 },
+        { title: 'Shared with the Team', color: '#7c4dff', position: 8 },
       ];
 
       const { data: newColumns, error: createError } = await supabase
