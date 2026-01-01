@@ -26,6 +26,7 @@ export function isOverdue(date: string | Date): boolean {
   const d = typeof date === 'string' ? new Date(date) : date;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
   return d < today;
 }
 
@@ -39,6 +40,66 @@ export function isToday(date: string | Date): boolean {
     d.getFullYear() === today.getFullYear()
   );
 }
+
+// Check if a date is within the next N days (not including today)
+export function isDueSoon(date: string | Date, days: number = 7): boolean {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+
+  const diffTime = d.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  // Due soon = within N days but not today and not overdue
+  return diffDays > 0 && diffDays <= days;
+}
+
+// Get days remaining until due date (negative if overdue)
+export function getDaysUntilDue(date: string | Date): number {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+
+  const diffTime = d.getTime() - today.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+// Due date status types for visual styling
+export type DueDateStatus = 'overdue' | 'due-today' | 'due-soon' | 'default';
+
+// Get the status of a due date for styling purposes
+export function getDueDateStatus(date: string | Date): DueDateStatus {
+  if (isOverdue(date)) return 'overdue';
+  if (isToday(date)) return 'due-today';
+  if (isDueSoon(date, 7)) return 'due-soon';
+  return 'default';
+}
+
+// Due date status colors (Tailwind classes)
+export const DUE_DATE_COLORS: Record<DueDateStatus, { icon: string; text: string; bg: string }> = {
+  'overdue': {
+    icon: 'text-red-500 dark:text-red-400',
+    text: 'text-red-600 dark:text-red-400',
+    bg: 'bg-red-50 dark:bg-red-500/10',
+  },
+  'due-today': {
+    icon: 'text-orange-500 dark:text-orange-400',
+    text: 'text-orange-600 dark:text-orange-400',
+    bg: 'bg-orange-50 dark:bg-orange-500/10',
+  },
+  'due-soon': {
+    icon: 'text-amber-500 dark:text-amber-400',
+    text: 'text-amber-600 dark:text-amber-400',
+    bg: 'bg-amber-50 dark:bg-amber-500/10',
+  },
+  'default': {
+    icon: 'text-muted-foreground/70',
+    text: 'text-foreground',
+    bg: '',
+  },
+};
 
 // Get contrasting text color for a background
 export function getContrastColor(hexColor: string): string {

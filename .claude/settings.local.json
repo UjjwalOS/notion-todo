@@ -17,7 +17,9 @@
       "Bash(npx shadcn@latest add button dialog input dropdown-menu checkbox badge tooltip popover command scroll-area separator context-menu card -y)",
       "Bash(cat:*)",
       "Bash(npm run lint:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(find:*)",
+      "Bash(npx shadcn@latest add:*)"
     ]
   }
 }

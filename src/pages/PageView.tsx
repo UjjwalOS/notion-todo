@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { usePages } from '@/hooks';
+import { usePages, useTasks } from '@/hooks';
 import { useUIStore } from '@/stores';
 import { KanbanBoard, ListView } from '@/components/kanban';
 import { TaskModal } from '@/components/modals';
@@ -14,8 +14,11 @@ export function PageView() {
   const { pageId } = useParams<{ pageId: string }>();
   const navigate = useNavigate();
   const { pages, isLoading } = usePages();
-  const { openTaskModal } = useUIStore();
+  const { openTaskModal, taskDataVersion } = useUIStore();
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+
+  // Lift tasks hook to PageView level so it's shared between KanbanBoard and TaskModal
+  const tasksHook = useTasks({ pageId: pageId || undefined, refreshKey: taskDataVersion });
 
   const page = pages.find((p) => p.id === pageId);
 
@@ -145,14 +148,14 @@ export function PageView() {
       {/* Content */}
       <div className="flex-1 overflow-hidden">
         {viewMode === 'kanban' ? (
-          <KanbanBoard pageId={pageId} onTaskClick={handleTaskClick} />
+          <KanbanBoard pageId={pageId} onTaskClick={handleTaskClick} tasksHook={tasksHook} />
         ) : (
-          <ListView pageId={pageId} onTaskClick={handleTaskClick} />
+          <ListView pageId={pageId} onTaskClick={handleTaskClick} tasksHook={tasksHook} />
         )}
       </div>
 
-      {/* Task Modal */}
-      <TaskModal pageId={pageId} />
+      {/* Task Modal - shares the same tasks data */}
+      <TaskModal pageId={pageId} tasksHook={tasksHook} />
     </div>
   );
 }

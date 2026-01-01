@@ -107,19 +107,27 @@ export function useColumns(pageId: string | null) {
 
   // Reorder columns
   const reorderColumns = async (columnId: string, newPosition: number): Promise<boolean> => {
+    const currentIndex = columns.findIndex((c) => c.id === columnId);
+    if (currentIndex === -1) return false;
+
+    // Calculate new order
+    const newColumns = [...columns];
+    const [removed] = newColumns.splice(currentIndex, 1);
+    newColumns.splice(newPosition, 0, removed);
+    const reorderedColumns = newColumns.map((col, index) => ({ ...col, position: index }));
+
+    // Store previous state for rollback
+    const previousColumns = [...columns];
+
+    // OPTIMISTIC UPDATE: Update UI immediately
+    setColumns(reorderedColumns);
+
     try {
-      const currentIndex = columns.findIndex((c) => c.id === columnId);
-      if (currentIndex === -1) return false;
-
-      const newColumns = [...columns];
-      const [removed] = newColumns.splice(currentIndex, 1);
-      newColumns.splice(newPosition, 0, removed);
-
       // Prepare batch update payload - include page_id as required by upsert
-      const updates = newColumns.map((col, index) => ({
+      const updates = reorderedColumns.map((col) => ({
         id: col.id,
         page_id: col.page_id,
-        position: index,
+        position: col.position,
       }));
 
       // Single batch upsert instead of N individual updates
@@ -129,9 +137,10 @@ export function useColumns(pageId: string | null) {
 
       if (updateError) throw updateError;
 
-      setColumns(newColumns.map((col, index) => ({ ...col, position: index })));
       return true;
     } catch (err) {
+      // Rollback on failure
+      setColumns(previousColumns);
       setError((err as Error).message);
       return false;
     }

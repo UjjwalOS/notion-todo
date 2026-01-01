@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { useColumns, useTasks } from '@/hooks';
-import { useUIStore } from '@/stores';
+import { useColumns } from '@/hooks';
 import { formatDate, isOverdue, PRIORITY_COLORS, PRIORITY_LABELS } from '@/lib/utils';
 import type { Task } from '@/types';
 import { cn } from '@/lib/utils';
@@ -11,15 +10,22 @@ import { Badge } from '@/components/ui/badge';
 type GroupBy = 'none' | 'status' | 'priority' | 'dueDate';
 type SortBy = 'title' | 'status' | 'dueDate' | 'priority' | 'created';
 
+// Type for the tasks hook return value (passed from parent)
+interface TasksHookReturn {
+  tasks: Task[];
+  isLoading: boolean;
+}
+
 interface ListViewProps {
   pageId: string;
   onTaskClick: (taskId: string) => void;
+  tasksHook: TasksHookReturn;
 }
 
-export function ListView({ pageId, onTaskClick }: ListViewProps) {
-  const { taskDataVersion } = useUIStore();
+export function ListView({ pageId, onTaskClick, tasksHook }: ListViewProps) {
   const { columns, isLoading: columnsLoading } = useColumns(pageId);
-  const { tasks, isLoading: tasksLoading } = useTasks({ pageId, refreshKey: taskDataVersion });
+  // Use the shared tasks hook from parent - no duplicate API calls!
+  const { tasks, isLoading: tasksLoading } = tasksHook;
 
   const [groupBy, setGroupBy] = useState<GroupBy>('status');
   const [sortBy, setSortBy] = useState<SortBy>('created');

@@ -1,8 +1,9 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { cn, formatDate, isOverdue, PRIORITY_COLORS } from '@/lib/utils';
+import { cn, formatDate, getDueDateStatus, DUE_DATE_COLORS, PRIORITY_COLORS } from '@/lib/utils';
+import { useSelectionStore } from '@/stores';
 import type { Task } from '@/types';
-import { Calendar } from 'lucide-react';
+import { Calendar, CalendarX, CalendarClock } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 
 interface TaskCardProps {
@@ -12,6 +13,9 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, onClick, isDragging = false }: TaskCardProps) {
+  const { selectedTaskIds, selectTask, toggleTaskSelection, openContextMenu } = useSelectionStore();
+  const isSelected = selectedTaskIds.has(task.id);
+
   const {
     attributes,
     listeners,
@@ -33,6 +37,29 @@ export function TaskCard({ task, onClick, isDragging = false }: TaskCardProps) {
   };
 
   const showDragging = isDragging || isSortableDragging;
+
+  // Handle click with modifier keys for multi-select
+  const handleClick = (e: React.MouseEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd + click: toggle selection
+      e.stopPropagation();
+      toggleTaskSelection(task.id);
+    } else if (e.shiftKey) {
+      // Shift + click: add to selection
+      e.stopPropagation();
+      selectTask(task.id, true);
+    } else {
+      // Normal click: open task (let parent handle)
+      onClick();
+    }
+  };
+
+  // Handle right-click for context menu
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openContextMenu(e.clientX, e.clientY, task.id);
+  };
 
   // Extract preview text from content
   const getPreviewText = (): string | null => {
@@ -78,7 +105,17 @@ export function TaskCard({ task, onClick, isDragging = false }: TaskCardProps) {
 
   const previewText = getPreviewText();
   const firstImageUrl = getFirstImageUrl();
-  const taskIsOverdue = task.due_date && isOverdue(task.due_date);
+
+  // Get due date status and colors
+  const dueDateStatus = task.due_date ? getDueDateStatus(task.due_date) : null;
+  const dueDateColors = dueDateStatus ? DUE_DATE_COLORS[dueDateStatus] : null;
+
+  // Choose icon based on due date status
+  const DueDateIcon = dueDateStatus === 'overdue'
+    ? CalendarX
+    : (dueDateStatus === 'due-today' || dueDateStatus === 'due-soon')
+    ? CalendarClock
+    : Calendar;
 
   return (
     <Card
@@ -87,10 +124,12 @@ export function TaskCard({ task, onClick, isDragging = false }: TaskCardProps) {
       {...attributes}
       {...listeners}
       className={cn(
-        'group cursor-grab gap-0 rounded-lg p-3 transition-all hover:shadow-md active:cursor-grabbing',
-        showDragging && 'rotate-2 opacity-90 shadow-lg'
+        'group relative cursor-grab gap-0 rounded-lg p-3 transition-all hover:shadow-md active:cursor-grabbing',
+        showDragging && 'rotate-2 opacity-90 shadow-lg',
+        isSelected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
       )}
-      onClick={onClick}
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
     >
       {/* Priority indicator */}
       {task.priority !== 'none' && (
@@ -129,12 +168,10 @@ export function TaskCard({ task, onClick, isDragging = false }: TaskCardProps) {
         <div
           className={cn(
             'mt-2 flex items-center gap-1 text-xs',
-            taskIsOverdue
-              ? 'text-destructive'
-              : 'text-muted-foreground'
+            dueDateColors?.text || 'text-muted-foreground'
           )}
         >
-          <Calendar className="h-3 w-3" />
+          <DueDateIcon className={cn('h-3 w-3', dueDateColors?.icon)} />
           {formatDate(task.due_date)}
         </div>
       )}

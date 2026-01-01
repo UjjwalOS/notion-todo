@@ -23,7 +23,11 @@ import {
 // Drop indicator line component
 function DropIndicatorLine() {
   return (
-    <div className="drop-indicator mx-1 my-1 h-1 rounded-full bg-primary" />
+    <div className="drop-indicator relative mx-1 my-2 animate-pulse">
+      <div className="h-0.5 rounded-full bg-primary" />
+      {/* Left dot indicator */}
+      <div className="absolute -left-0.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-primary shadow-md" />
+    </div>
   );
 }
 
@@ -69,8 +73,10 @@ export function KanbanColumn({
     },
   });
 
-  const { setNodeRef: setDroppableRef } = useDroppable({
-    id: column.id,
+  // Use a unique id for the droppable area (different from sortable column id)
+  const droppableId = `column-drop-${column.id}`;
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: droppableId,
     data: {
       type: 'column',
       column,
@@ -96,8 +102,8 @@ export function KanbanColumn({
     setShowColorPicker(false);
   };
 
-  // Check if this column is the current drop target
-  const isDropTarget = dropIndicator !== null;
+  // Check if this column is the current drop target (either via drop indicator or direct isOver)
+  const isDropTarget = dropIndicator !== null || isOver;
 
   return (
     <div
@@ -216,15 +222,21 @@ export function KanbanColumn({
       {/* Task list */}
       <div
         ref={setDroppableRef}
-        className="flex-1 overflow-y-auto px-2 pb-2"
+        className={cn(
+          "flex-1 overflow-y-auto px-2 pb-2",
+          tasks.length === 0 && "min-h-[120px]"
+        )}
       >
         <SortableContext
           items={tasks.map((t) => t.id)}
           strategy={verticalListSortingStrategy}
         >
           {tasks.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              {isDropTarget ? <DropIndicatorLine /> : 'No tasks'}
+            <div className={cn(
+              "flex h-full min-h-[100px] items-center justify-center text-sm text-muted-foreground transition-all rounded-lg border-2 border-dashed border-transparent",
+              (isOver || (isDragActive && dropIndicator !== null)) && "bg-primary/5 border-primary/30"
+            )}>
+              {(isOver || (isDragActive && dropIndicator !== null)) ? <DropIndicatorLine /> : 'No tasks'}
             </div>
           ) : (
             <div className="space-y-2">

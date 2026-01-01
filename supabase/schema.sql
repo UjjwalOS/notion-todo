@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     priority TEXT NOT NULL DEFAULT 'none' CHECK (priority IN ('none', 'low', 'medium', 'high')),
     due_date TIMESTAMPTZ,
     assignee_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    assignee TEXT, -- Simple name-based assignee (not tied to auth)
     position INTEGER NOT NULL DEFAULT 0,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     deleted_at TIMESTAMPTZ,

@@ -37,6 +37,7 @@ export interface Task {
   priority: Priority;
   due_date: string | null;
   assignee_id: string | null;
+  assignee: string | null; // Simple name-based assignee
   position: number;
   is_deleted: boolean;
   deleted_at: string | null;
@@ -119,6 +120,7 @@ export interface TaskUpdate {
   content?: Record<string, unknown> | null;
   priority?: Priority;
   due_date?: string | null;
+  assignee?: string | null;
   position?: number;
   is_deleted?: boolean;
   deleted_at?: string | null;
