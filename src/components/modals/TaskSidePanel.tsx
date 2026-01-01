@@ -1,0 +1,544 @@
+import { useState } from 'react';
+import { formatDate, getDueDateStatus, DUE_DATE_COLORS } from '@/lib/utils';
+import { PRIORITY_COLORS } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import type { Task, Priority, TaskUpdate } from '@/types';
+import { useAssigneeStore } from '@/stores';
+import { useComments } from '@/hooks';
+import { toast } from 'sonner';
+import {
+  Calendar as CalendarIcon,
+  CalendarX,
+  CalendarClock,
+  Flag,
+  Trash2,
+  MoreHorizontal,
+  X,
+  ChevronDown,
+  User,
+  Plus,
+  Check,
+  MessageSquare,
+  Loader2,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { CommentItem } from '@/components/comments/CommentItem';
+import { CommentInput } from '@/components/comments/CommentInput';
+
+interface TaskSidePanelProps {
+  task: Task;
+  onUpdate: (updates: Partial<TaskUpdate>) => void;
+  onDelete: () => void;
+  width: number;
+  onResize: (delta: number) => void;
+}
+
+type TabType = 'details' | 'comments';
+
+// Priority configuration with semantic colors
+const PRIORITY_CONFIG: Record<Priority, { label: string; color: string }> = {
+  none: { label: 'No priority', color: 'text-muted-foreground' },
+  low: { label: 'Low', color: 'text-green-600 dark:text-green-400' },
+  medium: { label: 'Medium', color: 'text-amber-600 dark:text-amber-400' },
+  high: { label: 'High', color: 'text-red-600 dark:text-red-400' },
+};
+
+interface ResizeHandleProps {
+  onResize: (delta: number) => void;
+}
+
+function ResizeHandle({ onResize }: ResizeHandleProps) {
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const delta = startX - moveEvent.clientX;
+      onResize(delta);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  return (
+    <div
+      onMouseDown={handleMouseDown}
+      className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors z-10"
+      title="Drag to resize"
+    />
+  );
+}
+
+export function TaskSidePanel({ task, onUpdate, onDelete, width, onResize }: TaskSidePanelProps) {
+  const [activeTab, setActiveTab] = useState<TabType>('details');
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [priorityOpen, setPriorityOpen] = useState(false);
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
+  const [newAssigneeName, setNewAssigneeName] = useState('');
+
+  const { assignees, addAssignee, getAssigneeByName } = useAssigneeStore();
+
+  // Comments hook
+  const {
+    comments,
+    commentCount,
+    isLoading: commentsLoading,
+    createComment,
+    updateComment,
+    deleteComment,
+  } = useComments({ taskId: task.id });
+
+  // Get current assignee info
+  const currentAssignee = task.assignee ? getAssigneeByName(task.assignee) : null;
+
+  const handlePriorityChange = (priority: Priority) => {
+    onUpdate({ priority });
+    setPriorityOpen(false);
+  };
+
+  const handleAssigneeSelect = (name: string | null) => {
+    onUpdate({ assignee: name });
+    setAssigneeOpen(false);
+  };
+
+  const handleCreateAssignee = () => {
+    if (newAssigneeName.trim()) {
+      const assignee = addAssignee(newAssigneeName.trim());
+      onUpdate({ assignee: assignee.name });
+      setNewAssigneeName('');
+      setAssigneeOpen(false);
+    }
+  };
+
+  const clearAssignee = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onUpdate({ assignee: null });
+  };
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      onUpdate({ due_date: date.toISOString() });
+    }
+    setDatePickerOpen(false);
+  };
+
+  const clearDueDate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onUpdate({ due_date: null });
+  };
+
+  // Comment handlers
+  const handleAddComment = async (content: string): Promise<boolean> => {
+    const result = await createComment({
+      task_id: task.id,
+      content,
+    });
+    if (result) {
+      toast.success('Comment added');
+      return true;
+    }
+    return false;
+  };
+
+  const handleUpdateComment = async (id: string, content: string): Promise<boolean> => {
+    const success = await updateComment({ id, content });
+    if (success) {
+      toast.success('Comment updated');
+    } else {
+      toast.error('Failed to update comment');
+    }
+    return success;
+  };
+
+  const handleDeleteComment = async (id: string): Promise<boolean> => {
+    const success = await deleteComment(id);
+    if (success) {
+      toast.success('Comment deleted');
+    } else {
+      toast.error('Failed to delete comment');
+    }
+    return success;
+  };
+
+  const priorityConfig = PRIORITY_CONFIG[task.priority];
+
+  return (
+    <div className="relative flex h-full flex-shrink-0 flex-col bg-muted/30" style={{ width }}>
+      {/* Resize Handle */}
+      <ResizeHandle onResize={onResize} />
+
+      {/* Tab Header - matches main content header height (py-3 = 12px each side) */}
+      <div className="flex flex-shrink-0 items-center justify-between border-b px-2 py-3">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setActiveTab('details')}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              activeTab === 'details'
+                ? 'bg-accent text-accent-foreground'
+                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+            )}
+          >
+            Details
+          </button>
+          <button
+            onClick={() => setActiveTab('comments')}
+            className={cn(
+              'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              activeTab === 'comments'
+                ? 'bg-accent text-accent-foreground'
+                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+            )}
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            {commentCount > 0 && (
+              <span className="text-xs">{commentCount}</span>
+            )}
+          </button>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem
+              onClick={onDelete}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete task
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'details' ? (
+        <>
+          {/* Details Tab */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4">
+              {/* Property rows container */}
+              <div className="space-y-1">
+                {/* Priority Row */}
+                <Popover open={priorityOpen} onOpenChange={setPriorityOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      className={cn(
+                        'group flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors',
+                        'hover:bg-accent/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+                      )}
+                    >
+                      <Flag className="h-4 w-4 flex-shrink-0 text-muted-foreground/70" />
+                      <span className="w-14 flex-shrink-0 text-left text-muted-foreground">Priority</span>
+                      <div className="flex flex-1 items-center justify-between">
+                        <div className={cn('flex items-center gap-1.5', priorityConfig.color)}>
+                          {task.priority !== 'none' && (
+                            <span
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: PRIORITY_COLORS[task.priority] }}
+                            />
+                          )}
+                          <span className="text-sm">{priorityConfig.label}</span>
+                        </div>
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100" />
+                      </div>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 p-1" align="start" sideOffset={4}>
+                    <div className="space-y-0.5">
+                      {(['none', 'low', 'medium', 'high'] as Priority[]).map((priority) => {
+                        const config = PRIORITY_CONFIG[priority];
+                        const isSelected = task.priority === priority;
+                        return (
+                          <button
+                            key={priority}
+                            onClick={() => handlePriorityChange(priority)}
+                            className={cn(
+                              'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                              'hover:bg-accent focus:outline-none',
+                              isSelected && 'bg-accent'
+                            )}
+                          >
+                            {priority !== 'none' ? (
+                              <span
+                                className="h-2.5 w-2.5 rounded-full"
+                                style={{ backgroundColor: PRIORITY_COLORS[priority] }}
+                              />
+                            ) : (
+                              <span className="h-2.5 w-2.5 rounded-full border border-dashed border-muted-foreground/40" />
+                            )}
+                            <span className={config.color}>{config.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Due Date Row */}
+                <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                  <PopoverTrigger asChild>
+                    {(() => {
+                      const dueDateStatus = task.due_date ? getDueDateStatus(task.due_date) : null;
+                      const dueDateColors = dueDateStatus ? DUE_DATE_COLORS[dueDateStatus] : null;
+
+                      // Choose icon based on due date status
+                      const DueDateIcon = dueDateStatus === 'overdue'
+                        ? CalendarX
+                        : (dueDateStatus === 'due-today' || dueDateStatus === 'due-soon')
+                        ? CalendarClock
+                        : CalendarIcon;
+
+                      return (
+                        <button
+                          className={cn(
+                            'group flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors',
+                            'hover:bg-accent/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+                          )}
+                        >
+                          <DueDateIcon className={cn(
+                            "h-4 w-4 flex-shrink-0",
+                            dueDateColors?.icon || "text-muted-foreground/70"
+                          )} />
+                          <span className="w-14 flex-shrink-0 text-left text-muted-foreground">Due</span>
+                          <div className="flex flex-1 items-center justify-between">
+                            {task.due_date ? (
+                              <div className="flex items-center gap-1">
+                                <span className={cn("text-sm", dueDateColors?.text || "text-foreground")}>
+                                  {formatDate(task.due_date)}
+                                </span>
+                                <button
+                                  onClick={clearDueDate}
+                                  className="ml-1 rounded p-0.5 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                                >
+                                  <X className="h-3 w-3 text-muted-foreground" />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground/60">Empty</span>
+                            )}
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100" />
+                          </div>
+                        </button>
+                      );
+                    })()}
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start" sideOffset={4}>
+                    <Calendar
+                      mode="single"
+                      selected={task.due_date ? new Date(task.due_date) : undefined}
+                      onSelect={handleDateSelect}
+                      initialFocus
+                    />
+                    {task.due_date && (
+                      <div className="border-t p-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start text-muted-foreground hover:text-destructive"
+                          onClick={() => {
+                            onUpdate({ due_date: null });
+                            setDatePickerOpen(false);
+                          }}
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          Clear date
+                        </Button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+
+                {/* Assignee Row */}
+                <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      className={cn(
+                        'group flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors',
+                        'hover:bg-accent/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+                      )}
+                    >
+                      <User className="h-4 w-4 flex-shrink-0 text-muted-foreground/70" />
+                      <span className="w-14 flex-shrink-0 text-left text-muted-foreground">Assign</span>
+                      <div className="flex flex-1 items-center justify-between">
+                        {task.assignee ? (
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium text-white"
+                              style={{ backgroundColor: currentAssignee?.color || '#6b7280' }}
+                            >
+                              {task.assignee.charAt(0).toUpperCase()}
+                            </span>
+                            <span className="text-sm text-foreground">{task.assignee}</span>
+                            <button
+                              onClick={clearAssignee}
+                              className="ml-1 rounded p-0.5 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                            >
+                              <X className="h-3 w-3 text-muted-foreground" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground/60">Empty</span>
+                        )}
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100" />
+                      </div>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-1" align="start" sideOffset={4}>
+                    {/* Existing assignees */}
+                    <div className="space-y-0.5">
+                      {/* Unassigned option */}
+                      <button
+                        onClick={() => handleAssigneeSelect(null)}
+                        className={cn(
+                          'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                          'hover:bg-accent focus:outline-none',
+                          !task.assignee && 'bg-accent'
+                        )}
+                      >
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-muted-foreground/40">
+                          <User className="h-3 w-3 text-muted-foreground/40" />
+                        </span>
+                        <span className="text-muted-foreground">Unassigned</span>
+                        {!task.assignee && <Check className="ml-auto h-4 w-4 text-primary" />}
+                      </button>
+
+                      {/* Existing assignees list */}
+                      {assignees.map((assignee) => {
+                        const isSelected = task.assignee === assignee.name;
+                        return (
+                          <button
+                            key={assignee.id}
+                            onClick={() => handleAssigneeSelect(assignee.name)}
+                            className={cn(
+                              'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                              'hover:bg-accent focus:outline-none',
+                              isSelected && 'bg-accent'
+                            )}
+                          >
+                            <span
+                              className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium text-white"
+                              style={{ backgroundColor: assignee.color }}
+                            >
+                              {assignee.name.charAt(0).toUpperCase()}
+                            </span>
+                            <span>{assignee.name}</span>
+                            {isSelected && <Check className="ml-auto h-4 w-4 text-primary" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Divider */}
+                    <div className="my-1 border-t" />
+
+                    {/* Create new assignee */}
+                    <div className="p-1">
+                      <div className="flex gap-1">
+                        <Input
+                          placeholder="Add new person..."
+                          value={newAssigneeName}
+                          onChange={(e) => setNewAssigneeName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleCreateAssignee();
+                            }
+                          }}
+                          className="h-8 text-sm"
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 px-2"
+                          onClick={handleCreateAssignee}
+                          disabled={!newAssigneeName.trim()}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer - subtle metadata */}
+          <div className="border-t border-border/50 px-4 py-3">
+            <span className="text-xs text-muted-foreground/60">
+              Created {formatDate(task.created_at)}
+            </span>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Comments Tab */}
+          <div className="flex flex-1 flex-col overflow-hidden min-h-0">
+            {commentsLoading ? (
+              <div className="flex flex-1 items-center justify-center">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                {/* Comments list - scrollable, no horizontal overflow */}
+                <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
+                  {comments.length > 0 ? (
+                    <div className="space-y-2">
+                      {comments.map((comment) => (
+                        <CommentItem
+                          key={comment.id}
+                          comment={comment}
+                          onUpdate={handleUpdateComment}
+                          onDelete={handleDeleteComment}
+                          compact
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <p className="text-xs text-muted-foreground">
+                        No comments yet
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Comment input - sticky at bottom */}
+                <div className="flex-shrink-0 border-t p-2">
+                  <CommentInput onSubmit={handleAddComment} compact />
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

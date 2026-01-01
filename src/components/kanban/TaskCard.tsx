@@ -3,16 +3,17 @@ import { CSS } from '@dnd-kit/utilities';
 import { cn, formatDate, getDueDateStatus, DUE_DATE_COLORS, PRIORITY_COLORS } from '@/lib/utils';
 import { useSelectionStore } from '@/stores';
 import type { Task } from '@/types';
-import { Calendar, CalendarX, CalendarClock } from 'lucide-react';
+import { Calendar, CalendarX, CalendarClock, MessageSquare } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 
 interface TaskCardProps {
   task: Task;
   onClick: () => void;
   isDragging?: boolean;
+  commentCount?: number;
 }
 
-export function TaskCard({ task, onClick, isDragging = false }: TaskCardProps) {
+export function TaskCard({ task, onClick, isDragging = false, commentCount = 0 }: TaskCardProps) {
   const { selectedTaskIds, selectTask, toggleTaskSelection, openContextMenu } = useSelectionStore();
   const isSelected = selectedTaskIds.has(task.id);
 
@@ -124,57 +125,75 @@ export function TaskCard({ task, onClick, isDragging = false }: TaskCardProps) {
       {...attributes}
       {...listeners}
       className={cn(
-        'group relative cursor-grab gap-0 rounded-lg p-3 transition-all hover:shadow-md active:cursor-grabbing',
+        'group relative cursor-grab gap-0 rounded-lg overflow-hidden transition-all hover:shadow-md active:cursor-grabbing',
+        'py-0', // Override Card's default py-6 for edge-to-edge images
         showDragging && 'rotate-2 opacity-90 shadow-lg',
-        isSelected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+        isSelected && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
+        !firstImageUrl && 'p-3' // Only add padding when no image (image needs edge-to-edge)
       )}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
     >
-      {/* Priority indicator */}
-      {task.priority !== 'none' && (
-        <div
-          className="mb-1.5 h-1 w-8 rounded-full"
-          style={{ backgroundColor: PRIORITY_COLORS[task.priority] }}
-        />
-      )}
-
-      {/* Title */}
-      <h4 className="text-sm font-medium">
-        {task.title || 'Untitled'}
-      </h4>
-
-      {/* Preview text */}
-      {previewText && (
-        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-          {previewText}
-        </p>
-      )}
-
-      {/* Image thumbnail */}
+      {/* Image thumbnail - shown at top when present */}
       {firstImageUrl && (
-        <div className="mt-2 overflow-hidden rounded">
+        <div className="overflow-hidden">
           <img
             src={firstImageUrl}
             alt=""
-            className="h-24 w-full object-cover"
+            className="h-28 w-full object-cover"
             loading="lazy"
           />
         </div>
       )}
 
-      {/* Due date */}
-      {task.due_date && (
-        <div
-          className={cn(
-            'mt-2 flex items-center gap-1 text-xs',
-            dueDateColors?.text || 'text-muted-foreground'
-          )}
-        >
-          <DueDateIcon className={cn('h-3 w-3', dueDateColors?.icon)} />
-          {formatDate(task.due_date)}
-        </div>
-      )}
+      {/* Content area with padding */}
+      <div className={cn(firstImageUrl && 'p-3')}>
+        {/* Priority indicator */}
+        {task.priority !== 'none' && (
+          <div
+            className="mb-1.5 h-1 w-8 rounded-full"
+            style={{ backgroundColor: PRIORITY_COLORS[task.priority] }}
+          />
+        )}
+
+        {/* Title */}
+        <h4 className="text-sm font-medium">
+          {task.title || 'Untitled'}
+        </h4>
+
+        {/* Preview text */}
+        {previewText && (
+          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+            {previewText}
+          </p>
+        )}
+
+        {/* Footer with due date and comment count */}
+        {(task.due_date || commentCount > 0) && (
+          <div className="mt-2 flex items-center gap-3">
+            {/* Due date */}
+            {task.due_date && (
+              <div
+                className={cn(
+                  'flex items-center gap-1 text-xs',
+                  dueDateColors?.text || 'text-muted-foreground'
+                )}
+              >
+                <DueDateIcon className={cn('h-3 w-3', dueDateColors?.icon)} />
+                {formatDate(task.due_date)}
+              </div>
+            )}
+
+            {/* Comment count */}
+            {commentCount > 0 && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <MessageSquare className="h-3 w-3" />
+                {commentCount}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }

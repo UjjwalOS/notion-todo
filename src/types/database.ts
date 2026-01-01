@@ -57,6 +57,18 @@ export interface UserSettings {
   updated_at: string;
 }
 
+export interface Comment {
+  id: string;
+  task_id: string;
+  user_id: string;
+  content: string;
+  mentions: string[];
+  is_deleted: boolean;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Extended types with relations
 export interface PageWithChildren extends Page {
   children?: PageWithChildren[];
@@ -125,4 +137,17 @@ export interface TaskUpdate {
   is_deleted?: boolean;
   deleted_at?: string | null;
   completed_at?: string | null;
+}
+
+export interface CommentInsert {
+  task_id: string;
+  user_id: string;
+  content: string;
+  mentions?: string[];
+}
+
+export interface CommentUpdate {
+  id: string;
+  content?: string;
+  mentions?: string[];
 }

@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { useUIStore } from '@/stores';
-import { TaskMetadataPanel } from './TaskMetadataPanel';
+import { TaskSidePanel } from './TaskSidePanel';
 import { cn } from '@/lib/utils';
 import type { Task, TaskUpdate } from '@/types';
 import { PanelRight, Loader2, X } from 'lucide-react';
-import { LoadingSpinner } from '@/components/ui';
+import { LoadingSpinner, ConfirmDialog } from '@/components/ui';
 import {
   Dialog,
   DialogContent,
@@ -44,6 +44,19 @@ export function TaskModal({ tasksHook }: TaskModalProps) {
 
   const [title, setTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [sidePanelWidth, setSidePanelWidth] = useState(288); // 288px = 18rem default
+
+  // Min and max width for side panel
+  const MIN_PANEL_WIDTH = 240; // 15rem
+  const MAX_PANEL_WIDTH = 480; // 30rem
+
+  const handlePanelResize = useCallback((delta: number) => {
+    setSidePanelWidth(prev => {
+      const newWidth = prev + delta;
+      return Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, newWidth));
+    });
+  }, []);
 
   // Use a ref to track if we've ever found the task - refs persist across renders without causing re-renders
   const hasFoundTaskRef = useRef(false);
@@ -119,15 +132,18 @@ export function TaskModal({ tasksHook }: TaskModalProps) {
     return () => clearTimeout(timeout);
   }, [title, task, handleSave]);
 
-  // Handle delete
-  const handleDelete = async () => {
+  // Handle delete - show confirmation dialog
+  const handleDelete = () => {
     if (!task) return;
+    setShowDeleteConfirm(true);
+  };
 
-    if (confirm('Move this task to trash?')) {
-      const taskId = task.id;
-      closeTaskModal();
-      await deleteTask(taskId);
-    }
+  // Execute delete after confirmation
+  const executeDelete = async () => {
+    if (!task) return;
+    const taskId = task.id;
+    closeTaskModal();
+    await deleteTask(taskId);
   };
 
   // Handle content change
@@ -136,6 +152,7 @@ export function TaskModal({ tasksHook }: TaskModalProps) {
   };
 
   return (
+    <>
     <Dialog open={taskModalOpen} onOpenChange={(open) => !open && closeTaskModal()}>
       <DialogContent
         className="flex h-[90vh] w-full max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl"
@@ -216,6 +233,7 @@ export function TaskModal({ tasksHook }: TaskModalProps) {
                     onChange={handleContentChange}
                   />
                 </Suspense>
+
               </div>
             </div>
 
@@ -223,20 +241,34 @@ export function TaskModal({ tasksHook }: TaskModalProps) {
             <div
               className={cn(
                 'flex-shrink-0 overflow-hidden transition-all duration-200 ease-out',
-                taskModalSidePanelOpen ? 'w-72 opacity-100' : 'w-0 opacity-0'
+                taskModalSidePanelOpen ? 'opacity-100' : 'w-0 opacity-0'
               )}
+              style={{ width: taskModalSidePanelOpen ? sidePanelWidth : 0 }}
             >
-              <div className="h-full w-72">
-                <TaskMetadataPanel
-                  task={task}
-                  onUpdate={handleSave}
-                  onDelete={handleDelete}
-                />
-              </div>
+              <TaskSidePanel
+                task={task}
+                onUpdate={handleSave}
+                onDelete={handleDelete}
+                width={sidePanelWidth}
+                onResize={handlePanelResize}
+              />
             </div>
           </div>
         ) : null}
       </DialogContent>
     </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Move to trash?"
+        description="This task will be moved to trash. You can restore it later from the trash."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={executeDelete}
+      />
+    </>
   );
 }
