@@ -21,7 +21,8 @@
       "Bash(find:*)",
       "Bash(npx shadcn@latest add:*)",
       "Bash(npx vite:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(git fetch:*)"
     ]
   }
 }

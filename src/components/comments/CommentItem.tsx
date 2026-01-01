@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { MoreHorizontal, Pencil, Trash2, X, Check } from 'lucide-react';
 import { useAuthStore } from '@/stores';
@@ -68,7 +68,7 @@ export function CommentItem({ comment, onUpdate, onDelete, compact = false }: Co
   const renderContent = (content: string) => {
     // Check if content contains image markdown or base64 images
     const imageRegex = /!\[.*?\]\((.*?)\)|<img[^>]+src="([^"]+)"[^>]*>/g;
-    const parts: (string | JSX.Element)[] = [];
+    const parts: ReactNode[] = [];
     let lastIndex = 0;
     let match;
 
