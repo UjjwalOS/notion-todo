@@ -233,10 +233,10 @@ export function KanbanColumn({
         >
           {tasks.length === 0 ? (
             <div className={cn(
-              "flex h-full min-h-[100px] items-center justify-center text-sm text-muted-foreground transition-all rounded-lg border-2 border-dashed border-transparent",
+              "flex h-full min-h-[100px] items-center justify-center transition-all rounded-lg border-2 border-dashed border-transparent",
               (isOver || (isDragActive && dropIndicator !== null)) && "bg-primary/5 border-primary/30"
             )}>
-              {(isOver || (isDragActive && dropIndicator !== null)) ? <DropIndicatorLine /> : 'No tasks'}
+              {(isOver || (isDragActive && dropIndicator !== null)) && <DropIndicatorLine />}
             </div>
           ) : (
             <div className="space-y-2">
