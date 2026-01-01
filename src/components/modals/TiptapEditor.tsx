@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useCallback, useEffect, useState, useRef } from 'react';
+import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
+import type { NodeViewProps } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
-import { Loader2 } from 'lucide-react';
+import { FileHandler } from '@tiptap/extension-file-handler';
+import { Loader2, ImageIcon } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface TiptapEditorProps {
   content: Record<string, unknown> | null;
@@ -26,44 +29,258 @@ const SLASH_MENU_ITEMS: SlashMenuItem[] = [
   { title: 'Bullet List', command: 'bullet', description: 'Create a bullet list' },
   { title: 'Numbered List', command: 'numbered', description: 'Create a numbered list' },
   { title: 'To-do', command: 'todo', description: 'Create a checkbox list' },
-  { title: 'Image', command: 'image', description: 'Insert an image' },
+  { title: 'Image', command: 'image', description: 'Upload or paste an image' },
 ];
 
-// Memoize extensions to prevent recreation on every render
-const extensions = [
-  StarterKit.configure({
-    heading: {
-      levels: [1, 2, 3],
-    },
-  }),
-  Placeholder.configure({
-    placeholder: 'Type "/" for commands...',
-  }),
-  TaskList,
-  TaskItem.configure({
-    nested: true,
-  }),
-  Image.configure({
-    HTMLAttributes: {
-      class: 'rounded-md max-w-full',
-    },
-  }),
-  Link.configure({
-    openOnClick: false,
-  }),
-];
+// Image constraints
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+const MIN_IMAGE_WIDTH = 50;
+const MAX_IMAGE_WIDTH = 800;
+const MIN_IMAGE_HEIGHT = 50;
+const MAX_IMAGE_HEIGHT = 600;
+
+// Helper to process image file
+const processImageFile = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (file.size > MAX_IMAGE_SIZE) {
+      reject(new Error('Image must be smaller than 5MB'));
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      reject(new Error('File must be an image'));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result;
+      if (typeof result === 'string') {
+        resolve(result);
+      } else {
+        reject(new Error('Failed to read image'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Failed to read image'));
+    reader.readAsDataURL(file);
+  });
+};
+
+// Resizable Image Component
+function ResizableImageComponent({ node, updateAttributes, selected }: NodeViewProps) {
+  const [isResizing, setIsResizing] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = (e: React.MouseEvent, direction: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+
+    const startX = e.clientX;
+    const startWidth = imageRef.current?.offsetWidth || 300;
+    const startHeight = imageRef.current?.offsetHeight || 200;
+    const aspectRatio = startWidth / startHeight;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      let newWidth = startWidth;
+      let newHeight = startHeight;
+
+      if (direction.includes('right')) {
+        newWidth = startWidth + (moveEvent.clientX - startX);
+      } else if (direction.includes('left')) {
+        newWidth = startWidth - (moveEvent.clientX - startX);
+      }
+
+      // Maintain aspect ratio
+      newHeight = newWidth / aspectRatio;
+
+      // Apply constraints
+      newWidth = Math.max(MIN_IMAGE_WIDTH, Math.min(MAX_IMAGE_WIDTH, newWidth));
+      newHeight = Math.max(MIN_IMAGE_HEIGHT, Math.min(MAX_IMAGE_HEIGHT, newHeight));
+
+      // Recalculate to maintain aspect ratio within constraints
+      if (newHeight > MAX_IMAGE_HEIGHT) {
+        newHeight = MAX_IMAGE_HEIGHT;
+        newWidth = newHeight * aspectRatio;
+      }
+
+      updateAttributes({
+        width: Math.round(newWidth),
+        height: Math.round(newHeight),
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  return (
+    <NodeViewWrapper className="relative inline-block my-2">
+      <div
+        ref={containerRef}
+        className={`relative inline-block ${selected ? 'ring-2 ring-[var(--color-accent)] ring-offset-2' : ''}`}
+      >
+        <img
+          ref={imageRef}
+          src={node.attrs.src}
+          alt={node.attrs.alt || ''}
+          width={node.attrs.width || undefined}
+          height={node.attrs.height || undefined}
+          className="rounded-md max-w-full block"
+          style={{
+            width: node.attrs.width ? `${node.attrs.width}px` : 'auto',
+            height: node.attrs.height ? `${node.attrs.height}px` : 'auto',
+            maxWidth: `${MAX_IMAGE_WIDTH}px`,
+            maxHeight: `${MAX_IMAGE_HEIGHT}px`,
+            minWidth: `${MIN_IMAGE_WIDTH}px`,
+            minHeight: `${MIN_IMAGE_HEIGHT}px`,
+          }}
+          draggable={false}
+        />
+
+        {/* Resize handles - only show when selected */}
+        {selected && (
+          <>
+            {/* Right handle */}
+            <div
+              className="absolute top-1/2 -right-2 w-4 h-8 -translate-y-1/2 cursor-ew-resize bg-[var(--color-accent)] rounded-sm opacity-80 hover:opacity-100 flex items-center justify-center"
+              onMouseDown={(e) => handleMouseDown(e, 'right')}
+            >
+              <div className="w-0.5 h-4 bg-white rounded-full" />
+            </div>
+
+            {/* Left handle */}
+            <div
+              className="absolute top-1/2 -left-2 w-4 h-8 -translate-y-1/2 cursor-ew-resize bg-[var(--color-accent)] rounded-sm opacity-80 hover:opacity-100 flex items-center justify-center"
+              onMouseDown={(e) => handleMouseDown(e, 'left')}
+            >
+              <div className="w-0.5 h-4 bg-white rounded-full" />
+            </div>
+          </>
+        )}
+
+        {/* Resizing indicator */}
+        {isResizing && (
+          <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+            {node.attrs.width || '?'} × {node.attrs.height || '?'}
+          </div>
+        )}
+      </div>
+    </NodeViewWrapper>
+  );
+}
+
+// Custom Image Extension with resize support
+const ResizableImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('width'),
+        renderHTML: (attributes) => {
+          if (!attributes.width) return {};
+          return { width: attributes.width };
+        },
+      },
+      height: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('height'),
+        renderHTML: (attributes) => {
+          if (!attributes.height) return {};
+          return { height: attributes.height };
+        },
+      },
+    };
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableImageComponent);
+  },
+});
 
 export function TiptapEditor({ content, onChange }: TiptapEditorProps) {
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 });
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Capture content on mount only - we intentionally skip updates to prevent editor resets
   const [initialContent] = useState(() => content || {
     type: 'doc',
     content: [{ type: 'paragraph' }],
   });
+
+  // Handle image insertion from file
+  const insertImage = useCallback((editor: ReturnType<typeof useEditor>, src: string, alt?: string) => {
+    editor?.chain().focus().setImage({ src, alt: alt || 'image' }).run();
+  }, []);
+
+  // Create extensions with file handler
+  const extensions = [
+    StarterKit.configure({
+      heading: {
+        levels: [1, 2, 3],
+      },
+    }),
+    Placeholder.configure({
+      placeholder: 'Type "/" for commands...',
+      showOnlyWhenEditable: true,
+      showOnlyCurrent: false,
+      includeChildren: false,
+    }),
+    TaskList,
+    TaskItem.configure({
+      nested: true,
+      HTMLAttributes: {
+        class: 'task-item',
+      },
+    }),
+    ResizableImage.configure({
+      inline: false,
+      allowBase64: true,
+      HTMLAttributes: {
+        class: 'resizable-image',
+      },
+    }),
+    Link.configure({
+      openOnClick: false,
+    }),
+    FileHandler.configure({
+      allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
+      onPaste: (currentEditor, files) => {
+        files.forEach(async (file) => {
+          try {
+            const src = await processImageFile(file);
+            insertImage(currentEditor, src, file.name);
+          } catch (error) {
+            toast.error((error as Error).message);
+          }
+        });
+      },
+      onDrop: (currentEditor, files, pos) => {
+        files.forEach(async (file) => {
+          try {
+            const src = await processImageFile(file);
+            currentEditor.chain().focus().insertContentAt(pos, {
+              type: 'image',
+              attrs: { src, alt: file.name },
+            }).run();
+          } catch (error) {
+            toast.error((error as Error).message);
+          }
+        });
+      },
+    }),
+  ];
 
   const editor = useEditor({
     extensions,
@@ -143,6 +360,24 @@ export function TiptapEditor({ content, onChange }: TiptapEditorProps) {
     item.command.toLowerCase().includes(slashFilter.toLowerCase())
   );
 
+  // Handle file input change
+  const handleFileInputChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editor) return;
+
+    try {
+      const src = await processImageFile(file);
+      insertImage(editor, src, file.name);
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, [editor, insertImage]);
+
   // Execute slash command
   const executeCommand = useCallback(
     (command: string) => {
@@ -175,13 +410,10 @@ export function TiptapEditor({ content, onChange }: TiptapEditorProps) {
         case 'todo':
           editor.chain().focus().toggleTaskList().run();
           break;
-        case 'image': {
-          const url = prompt('Enter image URL:');
-          if (url) {
-            editor.chain().focus().setImage({ src: url }).run();
-          }
+        case 'image':
+          // Open file picker instead of prompt
+          fileInputRef.current?.click();
           break;
-        }
       }
 
       setShowSlashMenu(false);
@@ -213,6 +445,15 @@ export function TiptapEditor({ content, onChange }: TiptapEditorProps) {
 
   return (
     <div className="relative">
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileInputChange}
+        className="hidden"
+      />
+
       <EditorContent editor={editor} />
 
       {/* Slash command menu */}
@@ -229,18 +470,23 @@ export function TiptapEditor({ content, onChange }: TiptapEditorProps) {
             <button
               key={item.command}
               onClick={() => executeCommand(item.command)}
-              className={`flex w-full flex-col px-3 py-2 text-left ${
+              className={`flex w-full items-center gap-3 px-3 py-2 text-left ${
                 index === selectedIndex
                   ? 'bg-[var(--color-bg-hover)]'
                   : 'hover:bg-[var(--color-bg-hover)]'
               }`}
             >
-              <span className="text-sm font-medium text-[var(--color-text-primary)]">
-                {item.title}
-              </span>
-              <span className="text-xs text-[var(--color-text-tertiary)]">
-                {item.description}
-              </span>
+              {item.command === 'image' && (
+                <ImageIcon className="h-4 w-4 text-[var(--color-text-tertiary)]" />
+              )}
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-[var(--color-text-primary)]">
+                  {item.title}
+                </span>
+                <span className="text-xs text-[var(--color-text-tertiary)]">
+                  {item.description}
+                </span>
+              </div>
             </button>
           ))}
         </div>

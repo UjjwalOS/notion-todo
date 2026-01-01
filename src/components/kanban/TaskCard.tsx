@@ -57,23 +57,27 @@ export function TaskCard({ task, onClick, isDragging = false }: TaskCardProps) {
     return null;
   };
 
-  // Check if content has images
-  const hasImage = (): boolean => {
-    if (!task.content) return false;
+  // Extract first image URL from content
+  const getFirstImageUrl = (): string | null => {
+    if (!task.content) return null;
 
     try {
-      const content = task.content as { content?: Array<{ type: string }> };
+      const content = task.content as { content?: Array<{ type: string; attrs?: { src?: string } }> };
       if (content.content) {
-        return content.content.some((block) => block.type === 'image');
+        for (const block of content.content) {
+          if (block.type === 'image' && block.attrs?.src) {
+            return block.attrs.src;
+          }
+        }
       }
     } catch {
       // Invalid content format
     }
-    return false;
+    return null;
   };
 
   const previewText = getPreviewText();
-  const taskHasImage = hasImage();
+  const firstImageUrl = getFirstImageUrl();
   const taskIsOverdue = task.due_date && isOverdue(task.due_date);
 
   return (
@@ -108,9 +112,16 @@ export function TaskCard({ task, onClick, isDragging = false }: TaskCardProps) {
         </p>
       )}
 
-      {/* Image indicator */}
-      {taskHasImage && (
-        <div className="mt-2 h-16 rounded bg-muted" />
+      {/* Image thumbnail */}
+      {firstImageUrl && (
+        <div className="mt-2 overflow-hidden rounded">
+          <img
+            src={firstImageUrl}
+            alt=""
+            className="h-24 w-full object-cover"
+            loading="lazy"
+          />
+        </div>
       )}
 
       {/* Due date */}
