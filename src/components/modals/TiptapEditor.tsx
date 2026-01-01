@@ -8,7 +8,16 @@ import TaskItem from '@tiptap/extension-task-item';
 import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 import { FileHandler } from '@tiptap/extension-file-handler';
-import { Loader2, ImageIcon } from 'lucide-react';
+import {
+  Loader2,
+  ImageIcon,
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  CheckSquare
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 interface TiptapEditorProps {
@@ -153,7 +162,7 @@ function ResizableImageComponent({ node, updateAttributes, selected }: NodeViewP
               className="absolute top-1/2 -right-2 w-4 h-8 -translate-y-1/2 cursor-ew-resize bg-[var(--color-accent)] rounded-sm opacity-80 hover:opacity-100 flex items-center justify-center"
               onMouseDown={(e) => handleMouseDown(e, 'right')}
             >
-              <div className="w-0.5 h-4 bg-white rounded-full" />
+              <div className="w-0.5 h-4 bg-[var(--color-on-accent)] rounded-full" />
             </div>
 
             {/* Left handle */}
@@ -161,14 +170,14 @@ function ResizableImageComponent({ node, updateAttributes, selected }: NodeViewP
               className="absolute top-1/2 -left-2 w-4 h-8 -translate-y-1/2 cursor-ew-resize bg-[var(--color-accent)] rounded-sm opacity-80 hover:opacity-100 flex items-center justify-center"
               onMouseDown={(e) => handleMouseDown(e, 'left')}
             >
-              <div className="w-0.5 h-4 bg-white rounded-full" />
+              <div className="w-0.5 h-4 bg-[var(--color-on-accent)] rounded-full" />
             </div>
           </>
         )}
 
         {/* Resizing indicator */}
         {isResizing && (
-          <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+          <div className="absolute bottom-2 right-2 bg-[var(--gray-950)]/70 text-[var(--color-on-accent)] text-xs px-2 py-1 rounded">
             {node.attrs.width || '?'} × {node.attrs.height || '?'}
           </div>
         )}
@@ -212,6 +221,8 @@ export function TiptapEditor({ content, onChange }: TiptapEditorProps) {
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const slashMenuRef = useRef<HTMLDivElement>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
 
   // Capture content on mount only - we intentionally skip updates to prevent editor resets
   const [initialContent] = useState(() => content || {
@@ -295,12 +306,56 @@ export function TiptapEditor({ content, onChange }: TiptapEditorProps) {
       handleKeyDown: (view, event) => {
         // Handle slash command
         if (event.key === '/' && !showSlashMenu) {
+          // Get the editor container's bounding rect
+          const editorElement = view.dom;
+          const editorRect = editorElement.getBoundingClientRect();
+
+          // Get cursor position relative to viewport
           const { from } = view.state.selection;
           const coords = view.coordsAtPos(from);
-          setSlashMenuPosition({
-            top: coords.bottom + 8,
-            left: coords.left,
-          });
+
+          // Calculate position relative to the editor container
+          const relativeTop = coords.bottom - editorRect.top;
+          const relativeLeft = coords.left - editorRect.left;
+
+          const gap = 4;
+          const menuHeight = 320;
+          const menuWidth = 256;
+          const padding = 8;
+
+          const viewportHeight = window.innerHeight;
+
+          // Check space below and above (using viewport coords for this check)
+          const spaceBelow = viewportHeight - coords.bottom - gap - padding;
+          const spaceAbove = coords.top - gap - padding;
+
+          let top: number;
+
+          if (spaceBelow >= menuHeight) {
+            top = relativeTop + gap;
+          } else if (spaceAbove >= menuHeight) {
+            top = relativeTop - (coords.bottom - coords.top) - gap - menuHeight;
+          } else {
+            if (spaceBelow >= spaceAbove) {
+              top = relativeTop + gap;
+            } else {
+              top = Math.max(0, relativeTop - (coords.bottom - coords.top) - gap - menuHeight);
+            }
+          }
+
+          // Position at the cursor's left position (relative to editor)
+          let left = relativeLeft;
+
+          // Ensure menu doesn't overflow the editor width
+          const editorWidth = editorRect.width;
+          if (left + menuWidth > editorWidth - padding) {
+            left = Math.max(0, editorWidth - menuWidth - padding);
+          }
+          if (left < 0) {
+            left = 0;
+          }
+
+          setSlashMenuPosition({ top, left });
           setShowSlashMenu(true);
           setSlashFilter('');
           setSelectedIndex(0);
@@ -435,6 +490,7 @@ export function TiptapEditor({ content, onChange }: TiptapEditorProps) {
     return () => document.removeEventListener('click', handleClick);
   }, [showSlashMenu]);
 
+
   if (!editor) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
@@ -444,7 +500,7 @@ export function TiptapEditor({ content, onChange }: TiptapEditorProps) {
   }
 
   return (
-    <div className="relative">
+    <div ref={editorContainerRef} className="relative">
       {/* Hidden file input for image upload */}
       <input
         ref={fileInputRef}
@@ -459,36 +515,50 @@ export function TiptapEditor({ content, onChange }: TiptapEditorProps) {
       {/* Slash command menu */}
       {showSlashMenu && filteredItems.length > 0 && (
         <div
-          className="fixed z-50 w-64 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-primary)] py-1 shadow-lg"
+          ref={slashMenuRef}
+          className="absolute z-50 w-64 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-primary)] py-1 shadow-lg overflow-y-auto"
           style={{
             top: slashMenuPosition.top,
             left: slashMenuPosition.left,
+            maxHeight: '320px',
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {filteredItems.map((item, index) => (
-            <button
-              key={item.command}
-              onClick={() => executeCommand(item.command)}
-              className={`flex w-full items-center gap-3 px-3 py-2 text-left ${
-                index === selectedIndex
-                  ? 'bg-[var(--color-bg-hover)]'
-                  : 'hover:bg-[var(--color-bg-hover)]'
-              }`}
-            >
-              {item.command === 'image' && (
-                <ImageIcon className="h-4 w-4 text-[var(--color-text-tertiary)]" />
-              )}
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-[var(--color-text-primary)]">
-                  {item.title}
-                </span>
-                <span className="text-xs text-[var(--color-text-tertiary)]">
-                  {item.description}
-                </span>
-              </div>
-            </button>
-          ))}
+          {filteredItems.map((item, index) => {
+            const IconComponent = {
+              h1: Heading1,
+              h2: Heading2,
+              h3: Heading3,
+              bullet: List,
+              numbered: ListOrdered,
+              todo: CheckSquare,
+              image: ImageIcon,
+            }[item.command];
+
+            return (
+              <button
+                key={item.command}
+                onClick={() => executeCommand(item.command)}
+                className={`flex w-full items-center gap-3 px-3 py-2 text-left ${
+                  index === selectedIndex
+                    ? 'bg-[var(--color-bg-hover)]'
+                    : 'hover:bg-[var(--color-bg-hover)]'
+                }`}
+              >
+                {IconComponent && (
+                  <IconComponent className="h-4 w-4 flex-shrink-0 text-[var(--color-text-tertiary)]" />
+                )}
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-[var(--color-text-primary)]">
+                    {item.title}
+                  </span>
+                  <span className="text-xs text-[var(--color-text-tertiary)]">
+                    {item.description}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

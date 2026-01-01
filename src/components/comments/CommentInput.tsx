@@ -146,7 +146,7 @@ export function CommentInput({ onSubmit, compact = false }: CommentInputProps) {
         <button
           onClick={handleSubmit}
           disabled={!content.trim() || isSubmitting}
-          className="flex-shrink-0 rounded-md bg-[var(--color-accent)] p-1.5 text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
+          className="flex-shrink-0 rounded-md bg-[var(--color-accent)] p-1.5 text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
           title="Send"
         >
           {isSubmitting ? (
@@ -162,7 +162,7 @@ export function CommentInput({ onSubmit, compact = false }: CommentInputProps) {
   return (
     <div className="flex gap-3 pt-3">
       {/* Avatar */}
-      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-accent)] text-sm font-medium text-white">
+      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-accent)] text-sm font-medium text-[var(--color-on-accent)]">
         {getInitials()}
       </div>
 
@@ -209,7 +209,7 @@ export function CommentInput({ onSubmit, compact = false }: CommentInputProps) {
             <button
               onClick={handleSubmit}
               disabled={!content.trim() || isSubmitting}
-              className="flex items-center gap-1 rounded-md bg-[var(--color-accent)] px-3 py-1 text-xs font-medium text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
+              className="flex items-center gap-1 rounded-md bg-[var(--color-accent)] px-3 py-1 text-xs font-medium text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
             >
               {isSubmitting ? (
                 <Loader2 size={12} className="animate-spin" />

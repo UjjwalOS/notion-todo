@@ -23,7 +23,7 @@ export function formatDate(date: string | Date): string {
 
 // Check if a date is overdue
 export function isOverdue(date: string | Date): boolean {
-  const d = typeof date === 'string' ? new Date(date) : date;
+  const d = typeof date === 'string' ? new Date(date) : new Date(date.getTime());
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   d.setHours(0, 0, 0, 0);
@@ -43,7 +43,7 @@ export function isToday(date: string | Date): boolean {
 
 // Check if a date is within the next N days (not including today)
 export function isDueSoon(date: string | Date, days: number = 7): boolean {
-  const d = typeof date === 'string' ? new Date(date) : date;
+  const d = typeof date === 'string' ? new Date(date) : new Date(date.getTime());
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   d.setHours(0, 0, 0, 0);
@@ -57,7 +57,7 @@ export function isDueSoon(date: string | Date, days: number = 7): boolean {
 
 // Get days remaining until due date (negative if overdue)
 export function getDaysUntilDue(date: string | Date): number {
-  const d = typeof date === 'string' ? new Date(date) : date;
+  const d = typeof date === 'string' ? new Date(date) : new Date(date.getTime());
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   d.setHours(0, 0, 0, 0);
@@ -77,22 +77,22 @@ export function getDueDateStatus(date: string | Date): DueDateStatus {
   return 'default';
 }
 
-// Due date status colors (Tailwind classes)
+// Due date status colors (Tailwind classes) - Using Untitled UI color system
 export const DUE_DATE_COLORS: Record<DueDateStatus, { icon: string; text: string; bg: string }> = {
   'overdue': {
-    icon: 'text-red-500 dark:text-red-400',
-    text: 'text-red-600 dark:text-red-400',
-    bg: 'bg-red-50 dark:bg-red-500/10',
+    icon: 'text-[var(--error-500)]',
+    text: 'text-[var(--error-600)] dark:text-[var(--error-500)]',
+    bg: 'bg-[var(--error-50)] dark:bg-[var(--error-500)]/10',
   },
   'due-today': {
-    icon: 'text-orange-500 dark:text-orange-400',
-    text: 'text-orange-600 dark:text-orange-400',
-    bg: 'bg-orange-50 dark:bg-orange-500/10',
+    icon: 'text-[var(--warning-600)]',
+    text: 'text-[var(--warning-700)] dark:text-[var(--warning-500)]',
+    bg: 'bg-[var(--warning-50)] dark:bg-[var(--warning-500)]/10',
   },
   'due-soon': {
-    icon: 'text-amber-500 dark:text-amber-400',
-    text: 'text-amber-600 dark:text-amber-400',
-    bg: 'bg-amber-50 dark:bg-amber-500/10',
+    icon: 'text-[var(--warning-500)]',
+    text: 'text-[var(--warning-600)] dark:text-[var(--warning-400)]',
+    bg: 'bg-[var(--warning-25)] dark:bg-[var(--warning-500)]/10',
   },
   'default': {
     icon: 'text-muted-foreground/70',
@@ -111,24 +111,24 @@ export function getContrastColor(hexColor: string): string {
   return luminance > 0.5 ? '#000000' : '#ffffff';
 }
 
-// Default column colors
+// Default column colors - Using Untitled UI color system
 export const COLUMN_COLORS = [
-  '#e3e2e0', // Gray (default)
-  '#f5a623', // Orange
-  '#eb5757', // Red
-  '#9b51e0', // Purple
-  '#2383e2', // Blue
-  '#4caf50', // Green
-  '#00bcd4', // Cyan
-  '#ff9800', // Amber
+  'var(--gray-300)',     // Gray (default)
+  'var(--warning-500)',  // Orange
+  'var(--error-500)',    // Red
+  'var(--brand-500)',    // Purple
+  'var(--blue-500)',     // Blue
+  'var(--success-500)',  // Green
+  '#00bcd4',             // Cyan (not in palette)
+  'var(--warning-400)',  // Amber
 ];
 
-// Priority colors
+// Priority colors - Using Untitled UI color system
 export const PRIORITY_COLORS: Record<string, string> = {
   none: 'transparent',
-  low: '#4caf50',
-  medium: '#f5a623',
-  high: '#eb5757',
+  low: 'var(--success-500)',
+  medium: 'var(--warning-500)',
+  high: 'var(--error-500)',
 };
 
 // Priority labels

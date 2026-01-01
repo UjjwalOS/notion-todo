@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { User, Session } from '@supabase/supabase-js';
+import type { User, Session, Subscription } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
 interface AuthState {
@@ -7,23 +7,32 @@ interface AuthState {
   session: Session | null;
   isLoading: boolean;
   error: string | null;
+  _authSubscription: Subscription | null;
 
   // Actions
   initialize: () => Promise<void>;
+  cleanup: () => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   session: null,
   isLoading: true,
   error: null,
+  _authSubscription: null,
 
   initialize: async () => {
     try {
+      // Clean up any existing subscription first
+      const existingSubscription = get()._authSubscription;
+      if (existingSubscription) {
+        existingSubscription.unsubscribe();
+      }
+
       // Get initial session
       const { data: { session }, error } = await supabase.auth.getSession();
 
@@ -35,18 +44,28 @@ export const useAuthStore = create<AuthState>((set) => ({
         isLoading: false,
       });
 
-      // Listen for auth changes
-      supabase.auth.onAuthStateChange((_event, session) => {
+      // Listen for auth changes and store the subscription
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
         set({
           session,
           user: session?.user ?? null,
         });
       });
+
+      set({ _authSubscription: subscription });
     } catch (error) {
       set({
         error: (error as Error).message,
         isLoading: false,
       });
+    }
+  },
+
+  cleanup: () => {
+    const subscription = get()._authSubscription;
+    if (subscription) {
+      subscription.unsubscribe();
+      set({ _authSubscription: null });
     }
   },
 

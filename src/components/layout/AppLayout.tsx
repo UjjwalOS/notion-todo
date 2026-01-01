@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { CommandPalette } from '@/components/modals';
@@ -6,18 +7,28 @@ import { cn } from '@/lib/utils';
 import { Menu } from 'lucide-react';
 
 export function AppLayout() {
-  const { sidebarHidden, toggleSidebarHidden } = useUIStore();
+  const { sidebarHidden, sidebarWidth, resizeSidebar, toggleSidebarHidden } = useUIStore();
+
+  const handleSidebarResize = useCallback(
+    (delta: number) => {
+      resizeSidebar(delta);
+    },
+    [resizeSidebar]
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--color-bg-primary)]">
       {/* Sidebar */}
       <div
         className={cn(
-          'h-full flex-shrink-0 transition-all duration-200',
-          sidebarHidden ? 'w-0' : 'w-60'
+          'h-full flex-shrink-0 transition-[width] duration-200',
+          sidebarHidden && 'w-0 border-r-0 overflow-hidden'
         )}
+        style={{ width: sidebarHidden ? 0 : sidebarWidth }}
       >
-        {!sidebarHidden && <Sidebar />}
+        {!sidebarHidden && (
+          <Sidebar width={sidebarWidth} onResize={handleSidebarResize} />
+        )}
       </div>
 
       {/* Main content */}

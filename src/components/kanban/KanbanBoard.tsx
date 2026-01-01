@@ -83,6 +83,11 @@ export function KanbanBoard({ pageId, onTaskClick, tasksHook }: KanbanBoardProps
     taskIds: string[];
     hasContent: boolean;
   }>({ isOpen: false, taskIds: [], hasContent: false });
+  const [columnDeleteConfirmation, setColumnDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    columnId: string | null;
+    taskCount: number;
+  }>({ isOpen: false, columnId: null, taskCount: 0 });
 
   // Handle keyboard shortcuts for selection
   useEffect(() => {
@@ -434,7 +439,10 @@ export function KanbanBoard({ pageId, onTaskClick, tasksHook }: KanbanBoardProps
       column_id: columnId,
       title: '',
     });
-    if (!result) {
+    if (result) {
+      // Immediately open the modal with the new task
+      onTaskClick(result.id);
+    } else {
       toast.error('Failed to create task');
     }
   };
@@ -449,13 +457,23 @@ export function KanbanBoard({ pageId, onTaskClick, tasksHook }: KanbanBoardProps
   const handleDeleteColumn = async (columnId: string) => {
     const columnTasks = tasksByColumn[columnId] || [];
     if (columnTasks.length > 0) {
-      if (!confirm('This column has tasks. Delete them all?')) {
-        return;
-      }
-      // Delete all tasks in the column
-      for (const task of columnTasks) {
-        await deleteTask(task.id);
-      }
+      // Show confirmation dialog for columns with tasks
+      setColumnDeleteConfirmation({
+        isOpen: true,
+        columnId,
+        taskCount: columnTasks.length,
+      });
+      return;
+    }
+    await executeColumnDelete(columnId);
+  };
+
+  // Actually perform the column deletion
+  const executeColumnDelete = async (columnId: string) => {
+    const columnTasks = tasksByColumn[columnId] || [];
+    // Delete all tasks in the column first
+    for (const task of columnTasks) {
+      await deleteTask(task.id);
     }
     const success = await deleteColumn(columnId);
     if (success) {
@@ -558,7 +576,7 @@ export function KanbanBoard({ pageId, onTaskClick, tasksHook }: KanbanBoardProps
         onDuplicate={handleDuplicateTask}
       />
 
-      {/* Delete confirmation dialog */}
+      {/* Delete confirmation dialog for tasks */}
       <ConfirmDialog
         open={deleteConfirmation.isOpen}
         onOpenChange={(open) => setDeleteConfirmation(prev => ({ ...prev, isOpen: open }))}
@@ -569,6 +587,24 @@ export function KanbanBoard({ pageId, onTaskClick, tasksHook }: KanbanBoardProps
         variant="destructive"
         onConfirm={() => executeDelete(deleteConfirmation.taskIds)}
         onCancel={() => setDeleteConfirmation({ isOpen: false, taskIds: [], hasContent: false })}
+      />
+
+      {/* Delete confirmation dialog for columns */}
+      <ConfirmDialog
+        open={columnDeleteConfirmation.isOpen}
+        onOpenChange={(open) => setColumnDeleteConfirmation(prev => ({ ...prev, isOpen: open }))}
+        title="Delete column?"
+        description={`This column has ${columnDeleteConfirmation.taskCount} task${columnDeleteConfirmation.taskCount !== 1 ? 's' : ''}. All tasks will be permanently deleted.`}
+        confirmLabel="Delete All"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={() => {
+          if (columnDeleteConfirmation.columnId) {
+            executeColumnDelete(columnDeleteConfirmation.columnId);
+          }
+          setColumnDeleteConfirmation({ isOpen: false, columnId: null, taskCount: 0 });
+        }}
+        onCancel={() => setColumnDeleteConfirmation({ isOpen: false, columnId: null, taskCount: 0 })}
       />
     </>
   );

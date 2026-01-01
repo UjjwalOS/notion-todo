@@ -1,10 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+// Sidebar width constraints
+const MIN_SIDEBAR_WIDTH = 200;
+const MAX_SIDEBAR_WIDTH = 400;
+const DEFAULT_SIDEBAR_WIDTH = 240;
+
 interface UIState {
   // Sidebar state
   sidebarCollapsed: boolean;
   sidebarHidden: boolean;
+  sidebarWidth: number;
   expandedPageIds: string[];
 
   // Modal state
@@ -21,6 +27,8 @@ interface UIState {
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebarHidden: () => void;
   setSidebarHidden: (hidden: boolean) => void;
+  setSidebarWidth: (width: number) => void;
+  resizeSidebar: (delta: number) => void;
   togglePageExpanded: (pageId: string) => void;
   setPageExpanded: (pageId: string, expanded: boolean) => void;
 
@@ -40,6 +48,7 @@ export const useUIStore = create<UIState>()(
       // Initial state
       sidebarCollapsed: false,
       sidebarHidden: false,
+      sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
       expandedPageIds: [],
       taskModalOpen: false,
       taskModalTaskId: null,
@@ -57,6 +66,19 @@ export const useUIStore = create<UIState>()(
         set((state) => ({ sidebarHidden: !state.sidebarHidden })),
 
       setSidebarHidden: (hidden) => set({ sidebarHidden: hidden }),
+
+      setSidebarWidth: (width) =>
+        set({
+          sidebarWidth: Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width)),
+        }),
+
+      resizeSidebar: (delta) =>
+        set((state) => ({
+          sidebarWidth: Math.min(
+            MAX_SIDEBAR_WIDTH,
+            Math.max(MIN_SIDEBAR_WIDTH, state.sidebarWidth + delta)
+          ),
+        })),
 
       togglePageExpanded: (pageId) => {
         const { expandedPageIds } = get();
@@ -110,6 +132,7 @@ export const useUIStore = create<UIState>()(
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
         sidebarHidden: state.sidebarHidden,
+        sidebarWidth: state.sidebarWidth,
         expandedPageIds: state.expandedPageIds,
         taskModalSidePanelOpen: state.taskModalSidePanelOpen,
       }),

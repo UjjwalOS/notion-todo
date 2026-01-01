@@ -8,6 +8,7 @@ import { PageView } from '@/pages/PageView';
 import { MyTasksView } from '@/pages/MyTasksView';
 import { TrashView } from '@/pages/TrashView';
 import { SettingsView } from '@/pages/SettingsView';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuthStore();
@@ -28,11 +29,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
-  const { initialize, user, isLoading } = useAuthStore();
+  const { initialize, cleanup, user, isLoading } = useAuthStore();
 
   useEffect(() => {
     initialize();
-  }, [initialize]);
+
+    // Cleanup auth subscription when app unmounts
+    return () => {
+      cleanup();
+    };
+  }, [initialize, cleanup]);
 
   if (isLoading) {
     return (
@@ -43,7 +49,7 @@ function App() {
   }
 
   return (
-    <>
+    <ErrorBoundary>
       <Toaster
         richColors
         position="bottom-right"
@@ -77,7 +83,7 @@ function App() {
           </Route>
         </Routes>
       </BrowserRouter>
-    </>
+    </ErrorBoundary>
   );
 }
 

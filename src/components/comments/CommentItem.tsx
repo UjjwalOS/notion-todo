@@ -109,7 +109,7 @@ export function CommentItem({ comment, onUpdate, onDelete, compact = false }: Co
   return (
     <div className={`group flex ${compact ? 'gap-2 py-1.5' : 'gap-3 py-3'}`}>
       {/* Avatar */}
-      <div className={`flex flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-accent)] font-medium text-white ${compact ? 'h-6 w-6 text-xs' : 'h-8 w-8 text-sm'}`}>
+      <div className={`flex flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-accent)] font-medium text-[var(--color-on-accent)] ${compact ? 'h-6 w-6 text-xs' : 'h-8 w-8 text-sm'}`}>
         {getInitials()}
       </div>
 
@@ -168,7 +168,7 @@ export function CommentItem({ comment, onUpdate, onDelete, compact = false }: Co
             <div className="flex gap-2">
               <button
                 onClick={handleSaveEdit}
-                className="flex items-center gap-1 rounded-md bg-[var(--color-accent)] px-2 py-1 text-xs text-white hover:bg-[var(--color-accent-hover)]"
+                className="flex items-center gap-1 rounded-md bg-[var(--color-accent)] px-2 py-1 text-xs text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)]"
               >
                 <Check size={12} />
                 Save

@@ -29,7 +29,7 @@ export function SettingsView() {
               </div>
               <button
                 onClick={() => signOut()}
-                className="rounded-md bg-[var(--color-danger)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90"
+                className="rounded-md bg-[var(--color-danger)] px-4 py-2 text-sm font-medium text-[var(--color-on-accent)] transition-colors hover:opacity-90"
               >
                 Sign Out
               </button>
@@ -52,7 +52,7 @@ export function SettingsView() {
                     onClick={() => setTheme(t)}
                     className={`rounded-md px-4 py-2 text-sm font-medium capitalize transition-colors ${
                       theme === t
-                        ? 'bg-[var(--color-accent)] text-white'
+                        ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)]'
                         : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]'
                     }`}
                   >

@@ -82,7 +82,7 @@ export function AuthPage() {
               type="submit"
               disabled={isLoading}
               className={cn(
-                'w-full rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-colors',
+                'w-full rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-on-accent)] transition-colors',
                 'hover:bg-[var(--color-accent-hover)]',
                 'disabled:cursor-not-allowed disabled:opacity-50'
               )}

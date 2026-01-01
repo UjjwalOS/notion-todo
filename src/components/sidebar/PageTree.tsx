@@ -66,7 +66,7 @@ function RenameModal({ page, onClose, onSave }: RenameModalProps) {
             </button>
             <button
               type="submit"
-              className="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm text-white hover:bg-[var(--color-accent-hover)]"
+              className="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)]"
             >
               Save
             </button>
@@ -80,7 +80,7 @@ function RenameModal({ page, onClose, onSave }: RenameModalProps) {
 export function PageTree() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { pageTree, isLoading, createPage, updatePage, deletePage } = usePages();
+  const { pageTree, isLoading, createPage, updatePage, deletePage, reorderPages } = usePages();
   const [renamingPage, setRenamingPage] = useState<PageWithChildren | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     isOpen: boolean;
@@ -88,10 +88,14 @@ export function PageTree() {
     hasContent: boolean;
   }>({ isOpen: false, page: null, hasContent: false });
 
-  const handleCreatePage = async (parentId?: string | null) => {
+  // Drag and drop state
+  const [draggedPageId, setDraggedPageId] = useState<string | null>(null);
+  const [dragOverPageId, setDragOverPageId] = useState<string | null>(null);
+
+  const handleCreatePage = async () => {
     const result = await createPage({
       title: 'Untitled',
-      parent_id: parentId || null,
+      parent_id: null,
     });
     if (!result) {
       toast.error('Failed to create page');
@@ -182,6 +186,46 @@ export function PageTree() {
     }
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, pageId: string) => {
+    setDraggedPageId(pageId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', pageId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, pageId: string) => {
+    e.preventDefault();
+    if (draggedPageId && draggedPageId !== pageId) {
+      setDragOverPageId(pageId);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedPageId(null);
+    setDragOverPageId(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetPageId: string) => {
+    e.preventDefault();
+
+    if (!draggedPageId || draggedPageId === targetPageId) {
+      handleDragEnd();
+      return;
+    }
+
+    // Find the index of the target page
+    const targetIndex = pageTree.findIndex(p => p.id === targetPageId);
+
+    if (targetIndex !== -1) {
+      const success = await reorderPages(draggedPageId, null, targetIndex);
+      if (!success) {
+        toast.error('Failed to reorder page');
+      }
+    }
+
+    handleDragEnd();
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -199,7 +243,7 @@ export function PageTree() {
           </p>
           <button
             onClick={() => handleCreatePage()}
-            className="inline-flex items-center gap-1 rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-sm text-white hover:bg-[var(--color-accent-hover)]"
+            className="inline-flex items-center gap-1 rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-sm text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)]"
           >
             <Plus size={14} />
             Create your first page
@@ -211,18 +255,23 @@ export function PageTree() {
             <PageTreeItem
               key={page.id}
               page={page}
-              onCreateSubpage={(parentId) => handleCreatePage(parentId)}
               onRename={setRenamingPage}
               onDelete={handleDelete}
               onDuplicate={handleDuplicate}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+              onDrop={handleDrop}
+              isDragging={draggedPageId !== null}
+              dragOverId={dragOverPageId}
             />
           ))}
           <button
             onClick={() => handleCreatePage()}
-            className="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]"
+            className="mt-1 flex w-full items-center gap-2 rounded-md py-1 px-2 text-sm text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]"
           >
-            <Plus size={14} />
-            Add page
+            <Plus size={16} className="flex-shrink-0" />
+            <span>Add page</span>
           </button>
         </>
       )}

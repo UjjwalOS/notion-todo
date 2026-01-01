@@ -43,9 +43,12 @@ export function TaskModal({ tasksHook }: TaskModalProps) {
   const { tasks, updateTask, deleteTask } = tasksHook;
 
   const [title, setTitle] = useState('');
+  const [pendingContent, setPendingContent] = useState<Record<string, unknown> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [sidePanelWidth, setSidePanelWidth] = useState(288); // 288px = 18rem default
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const shouldFocusTitleRef = useRef(false);
 
   // Min and max width for side panel
   const MIN_PANEL_WIDTH = 240; // 15rem
@@ -90,21 +93,39 @@ export function TaskModal({ tasksHook }: TaskModalProps) {
     hasFoundTaskRef.current = true;
   }
 
-  // Sync title with task
+  // Sync title with task and auto-focus for new tasks
   useEffect(() => {
     if (task) {
       setTitle(task.title);
+      // If this is a new task (empty title), mark for focus
+      if (!task.title) {
+        shouldFocusTitleRef.current = true;
+      }
     } else if (!taskModalOpen) {
       setTitle('');
+      shouldFocusTitleRef.current = false;
     }
   }, [task, taskModalOpen]);
+
+  // Auto-focus title input when opening a new task
+  useEffect(() => {
+    if (task && shouldFocusTitleRef.current && titleInputRef.current) {
+      // Small delay to ensure the dialog is fully rendered
+      const timeout = setTimeout(() => {
+        titleInputRef.current?.focus();
+        titleInputRef.current?.select();
+        shouldFocusTitleRef.current = false;
+      }, 50);
+      return () => clearTimeout(timeout);
+    }
+  }, [task]);
 
   // Simple logic: show loading if modal is open but we don't have a task yet (and haven't found one before)
   const showLoading = taskModalOpen && !task && !hasFoundTaskRef.current;
   // Never show "Task not found" - if the task disappears after we found it, just show loading or close
   // This prevents false "not found" during re-renders and state updates
 
-  // Save task changes
+  // Save task changes (with UI feedback for important changes)
   const handleSave = useCallback(
     async (updates: Partial<TaskUpdate>) => {
       if (!task) return;
@@ -121,6 +142,15 @@ export function TaskModal({ tasksHook }: TaskModalProps) {
     [task, updateTask, invalidateTaskData]
   );
 
+  // Silent save for content - no UI state updates to prevent flicker
+  const handleSilentSave = useCallback(
+    async (updates: Partial<TaskUpdate>) => {
+      if (!task) return;
+      await updateTask({ id: task.id, ...updates });
+    },
+    [task, updateTask]
+  );
+
   // Debounced title save
   useEffect(() => {
     if (!task || title === task.title) return;
@@ -131,6 +161,18 @@ export function TaskModal({ tasksHook }: TaskModalProps) {
 
     return () => clearTimeout(timeout);
   }, [title, task, handleSave]);
+
+  // Debounced content save - uses silent save to prevent background flicker
+  useEffect(() => {
+    if (!task || !pendingContent) return;
+
+    const timeout = setTimeout(() => {
+      handleSilentSave({ content: pendingContent });
+      setPendingContent(null);
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [pendingContent, task, handleSilentSave]);
 
   // Handle delete - show confirmation dialog
   const handleDelete = () => {
@@ -146,9 +188,9 @@ export function TaskModal({ tasksHook }: TaskModalProps) {
     await deleteTask(taskId);
   };
 
-  // Handle content change
+  // Handle content change - debounced via useEffect
   const handleContentChange = (content: Record<string, unknown>) => {
-    handleSave({ content });
+    setPendingContent(content);
   };
 
   return (
@@ -212,6 +254,7 @@ export function TaskModal({ tasksHook }: TaskModalProps) {
               <div className="flex-1 overflow-y-auto px-6 py-4">
                 {/* Title - Notion-style large heading */}
                 <input
+                  ref={titleInputRef}
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}

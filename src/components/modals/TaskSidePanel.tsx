@@ -44,12 +44,12 @@ interface TaskSidePanelProps {
 
 type TabType = 'details' | 'comments';
 
-// Priority configuration with semantic colors
+// Priority configuration with semantic colors - Using Untitled UI color system
 const PRIORITY_CONFIG: Record<Priority, { label: string; color: string }> = {
   none: { label: 'No priority', color: 'text-muted-foreground' },
-  low: { label: 'Low', color: 'text-green-600 dark:text-green-400' },
-  medium: { label: 'Medium', color: 'text-amber-600 dark:text-amber-400' },
-  high: { label: 'High', color: 'text-red-600 dark:text-red-400' },
+  low: { label: 'Low', color: 'text-[var(--success-600)] dark:text-[var(--success-500)]' },
+  medium: { label: 'Medium', color: 'text-[var(--warning-600)] dark:text-[var(--warning-500)]' },
+  high: { label: 'High', color: 'text-[var(--error-600)] dark:text-[var(--error-500)]' },
 };
 
 interface ResizeHandleProps {
@@ -390,7 +390,7 @@ export function TaskSidePanel({ task, onUpdate, onDelete, width, onResize }: Tas
                         {task.assignee ? (
                           <div className="flex items-center gap-1.5">
                             <span
-                              className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium text-white"
+                              className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium text-[var(--color-on-accent)]"
                               style={{ backgroundColor: currentAssignee?.color || '#6b7280' }}
                             >
                               {task.assignee.charAt(0).toUpperCase()}
@@ -443,7 +443,7 @@ export function TaskSidePanel({ task, onUpdate, onDelete, width, onResize }: Tas
                             )}
                           >
                             <span
-                              className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium text-white"
+                              className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium text-[var(--color-on-accent)]"
                               style={{ backgroundColor: assignee.color }}
                             >
                               {assignee.name.charAt(0).toUpperCase()}
