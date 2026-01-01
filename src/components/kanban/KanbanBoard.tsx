@@ -329,7 +329,28 @@ export function KanbanBoard({ pageId, onTaskClick, tasksHook }: KanbanBoardProps
       const activeData = active.data.current;
       const overData = over.data.current;
 
-      // Handle column reordering
+      // Handle column reordering - check if both active and over are column IDs
+      // This works even if data.current.type isn't set by checking against our column IDs
+      const activeIsColumn = columns.some((c) => c.id === active.id);
+
+      // over.id could be a column ID directly, or a "column-drop-{id}" droppable zone
+      const overId = String(over.id);
+      const overColumnId = overId.startsWith('column-drop-')
+        ? overId.replace('column-drop-', '')
+        : overId;
+      const overIsColumn = columns.some((c) => c.id === overColumnId);
+
+      if (activeIsColumn && overIsColumn) {
+        const activeIndex = columns.findIndex((c) => c.id === active.id);
+        const overIndex = columns.findIndex((c) => c.id === overColumnId);
+
+        if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+          await reorderColumns(active.id as string, overIndex);
+        }
+        return;
+      }
+
+      // Fallback: also check type-based column reordering
       if (activeData?.type === 'column' && overData?.type === 'column') {
         const activeIndex = columns.findIndex((c) => c.id === active.id);
         const overIndex = columns.findIndex((c) => c.id === over.id);

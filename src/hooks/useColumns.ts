@@ -123,10 +123,12 @@ export function useColumns(pageId: string | null) {
     setColumns(reorderedColumns);
 
     try {
-      // Prepare batch update payload - include page_id as required by upsert
+      // Prepare batch update payload - include all NOT NULL fields required by upsert
       const updates = reorderedColumns.map((col) => ({
         id: col.id,
         page_id: col.page_id,
+        title: col.title,
+        color: col.color,
         position: col.position,
       }));
 
