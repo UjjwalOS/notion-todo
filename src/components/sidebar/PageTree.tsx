@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { usePages } from '@/hooks';
 import { PageTreeItem } from './PageTreeItem';
@@ -77,6 +78,8 @@ function RenameModal({ page, onClose, onSave }: RenameModalProps) {
 }
 
 export function PageTree() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { pageTree, isLoading, createPage, updatePage, deletePage } = usePages();
   const [renamingPage, setRenamingPage] = useState<PageWithChildren | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
@@ -138,9 +141,30 @@ export function PageTree() {
   };
 
   const executeDelete = async (page: PageWithChildren) => {
+    // Check if we're currently viewing the page being deleted (or one of its children)
+    const currentPath = location.pathname;
+    const isViewingDeletedPage = currentPath === `/page/${page.id}` ||
+      currentPath.startsWith(`/page/${page.id}/`);
+
+    // Also check if viewing a child page of the deleted page
+    const isViewingChildPage = page.children?.some(child =>
+      currentPath === `/page/${child.id}` || currentPath.startsWith(`/page/${child.id}/`)
+    );
+
     const success = await deletePage(page.id);
     if (success) {
       toast.success('Page deleted');
+
+      // Navigate away if we were viewing the deleted page or its children
+      if (isViewingDeletedPage || isViewingChildPage) {
+        // Navigate to first available page or home
+        const remainingPages = pageTree.filter(p => p.id !== page.id);
+        if (remainingPages.length > 0) {
+          navigate(`/page/${remainingPages[0].id}`);
+        } else {
+          navigate('/');
+        }
+      }
     } else {
       toast.error('Failed to delete page');
     }
