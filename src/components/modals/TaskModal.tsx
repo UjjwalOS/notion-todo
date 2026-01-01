@@ -26,11 +26,10 @@ interface TasksHookReturn {
 }
 
 interface TaskModalProps {
-  pageId: string;
   tasksHook: TasksHookReturn;
 }
 
-export function TaskModal({ pageId, tasksHook }: TaskModalProps) {
+export function TaskModal({ tasksHook }: TaskModalProps) {
   const {
     taskModalOpen,
     taskModalTaskId,
@@ -41,7 +40,7 @@ export function TaskModal({ pageId, tasksHook }: TaskModalProps) {
   } = useUIStore();
 
   // Use the shared tasks hook from parent - no duplicate API calls!
-  const { tasks, isLoading: tasksLoading, updateTask, deleteTask } = tasksHook;
+  const { tasks, updateTask, deleteTask } = tasksHook;
 
   const [title, setTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);

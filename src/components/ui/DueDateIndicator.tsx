@@ -1,4 +1,4 @@
-import { Calendar, CalendarX, CalendarClock, CalendarCheck } from 'lucide-react';
+import { Calendar, CalendarX, CalendarClock } from 'lucide-react';
 import { cn, getDueDateStatus, getDaysUntilDue, formatDate, DUE_DATE_COLORS } from '@/lib/utils';
 import type { DueDateStatus } from '@/lib/utils';
 

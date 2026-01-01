@@ -155,7 +155,7 @@ export function PageView() {
       </div>
 
       {/* Task Modal - shares the same tasks data */}
-      <TaskModal pageId={pageId} tasksHook={tasksHook} />
+      <TaskModal tasksHook={tasksHook} />
     </div>
   );
 }
