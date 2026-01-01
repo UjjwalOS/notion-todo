@@ -4,7 +4,17 @@ import { useTasks } from '@/hooks';
 import { TaskMetadataPanel } from './TaskMetadataPanel';
 import { cn } from '@/lib/utils';
 import type { Task, TaskUpdate } from '@/types';
-import { X, PanelRight, Loader2 } from 'lucide-react';
+import { PanelRight, Loader2 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 // Lazy load the heavy TiptapEditor for faster modal opening
 const TiptapEditor = lazy(() => import('./TiptapEditor').then(m => ({ default: m.TiptapEditor })));
@@ -20,6 +30,7 @@ export function TaskModal({ pageId }: TaskModalProps) {
     taskModalSidePanelOpen,
     closeTaskModal,
     toggleTaskModalSidePanel,
+    invalidateTaskData,
   } = useUIStore();
 
   const { tasks, updateTask, deleteTask } = useTasks({ pageId });
@@ -50,11 +61,13 @@ export function TaskModal({ pageId }: TaskModalProps) {
       setIsSaving(true);
       try {
         await updateTask({ id: task.id, ...updates });
+        // Signal that task data has changed so other components can refresh
+        invalidateTaskData();
       } finally {
         setIsSaving(false);
       }
     },
-    [task, updateTask]
+    [task, updateTask, invalidateTaskData]
   );
 
   // Debounced title save
@@ -83,90 +96,68 @@ export function TaskModal({ pageId }: TaskModalProps) {
     handleSave({ content });
   };
 
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && taskModalOpen) {
-        closeTaskModal();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [taskModalOpen, closeTaskModal]);
-
-  if (!taskModalOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50"
-        onClick={closeTaskModal}
-      />
+    <Dialog open={taskModalOpen} onOpenChange={(open) => !open && closeTaskModal()}>
+      <DialogContent
+        className="flex h-[90vh] w-full max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl"
+        showCloseButton={true}
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Edit Task</DialogTitle>
+          <DialogDescription>Edit your task details</DialogDescription>
+        </DialogHeader>
 
-      {/* Modal */}
-      <div className="relative flex h-[90vh] w-full max-w-5xl overflow-hidden rounded-lg bg-[var(--color-bg-primary)] shadow-xl">
         {!task ? (
           <div className="flex flex-1 items-center justify-center">
-            <Loader2 size={24} className="animate-spin text-[var(--color-text-tertiary)]" />
+            <LoadingSpinner />
           </div>
         ) : (
-          <>
+          <div className="flex flex-1 overflow-hidden">
             {/* Main content area */}
             <div
               className={cn(
                 'flex flex-1 flex-col overflow-hidden',
-                taskModalSidePanelOpen ? 'border-r border-[var(--color-border)]' : ''
+                taskModalSidePanelOpen ? 'border-r' : ''
               )}
             >
               {/* Header */}
-              <div className="flex flex-shrink-0 items-center justify-between border-b border-[var(--color-border)] px-6 py-3">
+              <div className="flex flex-shrink-0 items-center justify-between border-b px-6 py-3">
                 <div className="flex items-center gap-2">
                   {isSaving && (
-                    <span className="text-xs text-[var(--color-text-tertiary)]">
+                    <span className="text-xs text-muted-foreground">
                       Saving...
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={toggleTaskModalSidePanel}
-                    className={cn(
-                      'rounded p-2 transition-colors',
-                      taskModalSidePanelOpen
-                        ? 'bg-[var(--color-bg-hover)] text-[var(--color-text-primary)]'
-                        : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]'
-                    )}
-                    title={taskModalSidePanelOpen ? 'Hide details' : 'Show details'}
-                  >
-                    <PanelRight size={18} />
-                  </button>
-                  <button
-                    onClick={closeTaskModal}
-                    className="rounded p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={toggleTaskModalSidePanel}
+                  className={cn(
+                    taskModalSidePanelOpen && 'bg-accent'
+                  )}
+                  title={taskModalSidePanelOpen ? 'Hide details' : 'Show details'}
+                >
+                  <PanelRight className="h-4 w-4" />
+                </Button>
               </div>
 
               {/* Content */}
               <div className="flex-1 overflow-y-auto px-6 py-4">
                 {/* Title */}
-                <input
+                <Input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Task title"
-                  className="mb-4 w-full border-none bg-transparent text-2xl font-semibold text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-tertiary)]"
+                  className="mb-4 border-none bg-transparent text-2xl font-semibold shadow-none focus-visible:ring-0"
                 />
 
                 {/* Tiptap Editor - Lazy loaded */}
                 <Suspense
                   fallback={
                     <div className="flex min-h-[200px] items-center justify-center">
-                      <Loader2 size={20} className="animate-spin text-[var(--color-text-tertiary)]" />
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
                   }
                 >
@@ -186,9 +177,9 @@ export function TaskModal({ pageId }: TaskModalProps) {
                 onDelete={handleDelete}
               />
             )}
-          </>
+          </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

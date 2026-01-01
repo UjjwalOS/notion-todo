@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -59,11 +59,11 @@ export function TiptapEditor({ content, onChange }: TiptapEditorProps) {
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // Memoize the initial content
-  const initialContent = useMemo(() => content || {
+  // Capture content on mount only - we intentionally skip updates to prevent editor resets
+  const [initialContent] = useState(() => content || {
     type: 'doc',
     content: [{ type: 'paragraph' }],
-  }, []);
+  });
 
   const editor = useEditor({
     extensions,

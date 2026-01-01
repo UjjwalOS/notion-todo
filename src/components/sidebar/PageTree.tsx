@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { usePages } from '@/hooks';
 import { PageTreeItem } from './PageTreeItem';
 import type { PageWithChildren } from '@/types';
@@ -78,28 +79,42 @@ export function PageTree() {
   const [renamingPage, setRenamingPage] = useState<PageWithChildren | null>(null);
 
   const handleCreatePage = async (parentId?: string | null) => {
-    await createPage({
+    const result = await createPage({
       title: 'Untitled',
       parent_id: parentId || null,
     });
+    if (!result) {
+      toast.error('Failed to create page');
+    }
   };
 
   const handleRename = async (id: string, title: string, icon: string | null) => {
-    await updatePage({ id, title, icon });
+    const success = await updatePage({ id, title, icon });
+    if (!success) {
+      toast.error('Failed to rename page');
+    }
   };
 
   const handleDelete = async (page: PageWithChildren) => {
     if (confirm(`Are you sure you want to delete "${page.title}"? This will also delete all subpages.`)) {
-      await deletePage(page.id);
+      const success = await deletePage(page.id);
+      if (success) {
+        toast.success('Page deleted');
+      } else {
+        toast.error('Failed to delete page');
+      }
     }
   };
 
   const handleDuplicate = async (page: PageWithChildren) => {
-    await createPage({
+    const result = await createPage({
       title: `${page.title} (copy)`,
       parent_id: page.parent_id,
       icon: page.icon,
     });
+    if (!result) {
+      toast.error('Failed to duplicate page');
+    }
   };
 
   if (isLoading) {

@@ -7,16 +7,17 @@ interface UseTasksOptions {
   pageId?: string | null;
   columnId?: string | null;
   includeDeleted?: boolean;
+  refreshKey?: number; // Change this to trigger a re-fetch
 }
 
 export function useTasks(options: UseTasksOptions = {}) {
-  const { pageId, columnId, includeDeleted = false } = options;
+  const { pageId, columnId, includeDeleted = false, refreshKey } = options;
   const { user } = useAuthStore();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch tasks
+  // Fetch tasks - refreshKey is intentionally included to trigger re-fetches
   const fetchTasks = useCallback(async () => {
     if (!user) return;
 
@@ -50,7 +51,7 @@ export function useTasks(options: UseTasksOptions = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [user, pageId, columnId, includeDeleted]);
+  }, [user, pageId, columnId, includeDeleted, refreshKey]);
 
   // Initial fetch
   useEffect(() => {
@@ -62,22 +63,7 @@ export function useTasks(options: UseTasksOptions = {}) {
     if (!user) return null;
 
     try {
-      // Get the next position (at top of column)
-      const columnTasks = tasks.filter((t) => t.column_id === data.column_id);
-
-      // Shift existing tasks down
-      const updates = columnTasks.map((t) => ({
-        id: t.id,
-        position: t.position + 1,
-      }));
-
-      for (const update of updates) {
-        await supabase
-          .from('tasks')
-          .update({ position: update.position })
-          .eq('id', update.id);
-      }
-
+      // First create the new task at position 0
       const { data: newTask, error: createError } = await supabase
         .from('tasks')
         .insert({
@@ -89,6 +75,22 @@ export function useTasks(options: UseTasksOptions = {}) {
         .single();
 
       if (createError) throw createError;
+
+      // Then shift existing tasks down using batch upsert
+      const columnTasks = tasks.filter((t) => t.column_id === data.column_id);
+      if (columnTasks.length > 0) {
+        const updates = columnTasks.map((t) => ({
+          id: t.id,
+          user_id: user.id,
+          page_id: t.page_id,
+          column_id: t.column_id,
+          position: t.position + 1,
+        }));
+
+        await supabase
+          .from('tasks')
+          .upsert(updates, { onConflict: 'id' });
+      }
 
       // Update local state
       setTasks((prev) => [
@@ -196,85 +198,87 @@ export function useTasks(options: UseTasksOptions = {}) {
     targetColumnId: string,
     targetPosition: number
   ): Promise<boolean> => {
-    try {
-      const task = tasks.find((t) => t.id === taskId);
-      if (!task) return false;
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || !user) return false;
 
-      const sourceColumnId = task.column_id;
-      const isMovingWithinColumn = sourceColumnId === targetColumnId;
+    const sourceColumnId = task.column_id;
+    const isMovingWithinColumn = sourceColumnId === targetColumnId;
 
-      // Get tasks in target column
-      const targetColumnTasks = tasks
-        .filter((t) => t.column_id === targetColumnId && t.id !== taskId)
+    // Get tasks in target column
+    const targetColumnTasks = tasks
+      .filter((t) => t.column_id === targetColumnId && t.id !== taskId)
+      .sort((a, b) => a.position - b.position);
+
+    // Calculate new positions
+    const updates: { id: string; position: number; column_id: string }[] = [];
+
+    // Insert task at target position
+    targetColumnTasks.splice(targetPosition, 0, { ...task, column_id: targetColumnId });
+
+    // Update positions for target column
+    targetColumnTasks.forEach((t, index) => {
+      if (t.id === taskId) {
+        updates.push({
+          id: taskId,
+          position: index,
+          column_id: targetColumnId,
+        });
+      } else if (t.position !== index) {
+        updates.push({ id: t.id, position: index, column_id: t.column_id });
+      }
+    });
+
+    // If moving between columns, also update source column positions
+    if (!isMovingWithinColumn) {
+      const sourceColumnTasks = tasks
+        .filter((t) => t.column_id === sourceColumnId && t.id !== taskId)
         .sort((a, b) => a.position - b.position);
 
-      // Calculate new positions
-      const updates: { id: string; position: number; column_id?: string }[] = [];
-
-      // Insert task at target position
-      targetColumnTasks.splice(targetPosition, 0, { ...task, column_id: targetColumnId });
-
-      // Update positions for target column
-      targetColumnTasks.forEach((t, index) => {
-        if (t.id === taskId) {
-          updates.push({
-            id: taskId,
-            position: index,
-            column_id: targetColumnId,
-          });
-        } else if (t.position !== index) {
-          updates.push({ id: t.id, position: index });
+      sourceColumnTasks.forEach((t, index) => {
+        if (t.position !== index) {
+          updates.push({ id: t.id, position: index, column_id: t.column_id });
         }
       });
+    }
 
-      // If moving between columns, also update source column positions
-      if (!isMovingWithinColumn) {
-        const sourceColumnTasks = tasks
-          .filter((t) => t.column_id === sourceColumnId && t.id !== taskId)
-          .sort((a, b) => a.position - b.position);
+    // Store previous state for rollback
+    const previousTasks = [...tasks];
 
-        sourceColumnTasks.forEach((t, index) => {
-          if (t.position !== index) {
-            updates.push({ id: t.id, position: index });
-          }
-        });
-
-        // TODO: Handle "Done" column automation
-        // Would need to look up column title and set completed_at if moving to Done
-      }
-
-      // Apply updates
-      for (const update of updates) {
-        const updateData: { position: number; column_id?: string; completed_at?: string | null } = {
-          position: update.position,
-        };
-        if (update.column_id) {
-          updateData.column_id = update.column_id;
+    // OPTIMISTIC UPDATE: Update local state immediately for instant UI feedback
+    setTasks((prev) =>
+      prev.map((t) => {
+        const update = updates.find((u) => u.id === t.id);
+        if (update) {
+          return {
+            ...t,
+            position: update.position,
+            column_id: update.column_id,
+          };
         }
+        return t;
+      })
+    );
 
-        await supabase
-          .from('tasks')
-          .update(updateData)
-          .eq('id', update.id);
-      }
+    // Then sync with database in background (batch upsert for performance)
+    try {
+      const upsertData = updates.map((u) => ({
+        id: u.id,
+        user_id: user.id,
+        page_id: task.page_id,
+        column_id: u.column_id,
+        position: u.position,
+      }));
 
-      // Update local state
-      setTasks((prev) =>
-        prev.map((t) => {
-          const update = updates.find((u) => u.id === t.id);
-          if (update) {
-            return {
-              ...t,
-              position: update.position,
-              column_id: update.column_id ?? t.column_id,
-            };
-          }
-          return t;
-        })
-      );
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .upsert(upsertData, { onConflict: 'id' });
+
+      if (updateError) throw updateError;
 
       return true;
     } catch (err) {
+      // Rollback on failure
+      setTasks(previousTasks);
       setError((err as Error).message);
       return false;
     }

@@ -11,6 +11,7 @@ interface UIState {
   taskModalOpen: boolean;
   taskModalTaskId: string | null;
   taskModalSidePanelOpen: boolean;
+  taskDataVersion: number; // Increments when task data changes, triggers refresh
 
   // Command palette
   commandPaletteOpen: boolean;
@@ -26,6 +27,7 @@ interface UIState {
   openTaskModal: (taskId: string | null) => void;
   closeTaskModal: () => void;
   toggleTaskModalSidePanel: () => void;
+  invalidateTaskData: () => void; // Call after task updates to trigger refresh
 
   openCommandPalette: () => void;
   closeCommandPalette: () => void;
@@ -42,6 +44,7 @@ export const useUIStore = create<UIState>()(
       taskModalOpen: false,
       taskModalTaskId: null,
       taskModalSidePanelOpen: true,
+      taskDataVersion: 0,
       commandPaletteOpen: false,
 
       // Sidebar actions
@@ -92,6 +95,9 @@ export const useUIStore = create<UIState>()(
         set((state) => ({
           taskModalSidePanelOpen: !state.taskModalSidePanelOpen,
         })),
+
+      invalidateTaskData: () =>
+        set((state) => ({ taskDataVersion: state.taskDataVersion + 1 })),
 
       // Command palette actions
       openCommandPalette: () => set({ commandPaletteOpen: true }),

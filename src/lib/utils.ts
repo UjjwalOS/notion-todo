@@ -1,8 +1,9 @@
-import { clsx, type ClassValue } from 'clsx';
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
 
-// Utility for combining Tailwind classes
+// Utility for combining Tailwind classes (enhanced with tailwind-merge)
 export function cn(...inputs: ClassValue[]) {
-  return clsx(inputs);
+  return twMerge(clsx(inputs))
 }
 
 // Generate a unique ID (for optimistic updates before DB confirms)
@@ -62,7 +63,7 @@ export const COLUMN_COLORS = [
 ];
 
 // Priority colors
-export const PRIORITY_COLORS = {
+export const PRIORITY_COLORS: Record<string, string> = {
   none: 'transparent',
   low: '#4caf50',
   medium: '#f5a623',
@@ -70,7 +71,7 @@ export const PRIORITY_COLORS = {
 };
 
 // Priority labels
-export const PRIORITY_LABELS = {
+export const PRIORITY_LABELS: Record<string, string> = {
   none: 'No priority',
   low: 'Low',
   medium: 'Medium',

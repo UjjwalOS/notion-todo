@@ -1,9 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useColumns, useTasks } from '@/hooks';
+import { useUIStore } from '@/stores';
 import { formatDate, isOverdue, PRIORITY_COLORS, PRIORITY_LABELS } from '@/lib/utils';
 import type { Task } from '@/types';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui';
+import { Badge } from '@/components/ui/badge';
 
 type GroupBy = 'none' | 'status' | 'priority' | 'dueDate';
 type SortBy = 'title' | 'status' | 'dueDate' | 'priority' | 'created';
@@ -14,19 +17,20 @@ interface ListViewProps {
 }
 
 export function ListView({ pageId, onTaskClick }: ListViewProps) {
+  const { taskDataVersion } = useUIStore();
   const { columns, isLoading: columnsLoading } = useColumns(pageId);
-  const { tasks, isLoading: tasksLoading } = useTasks({ pageId });
+  const { tasks, isLoading: tasksLoading } = useTasks({ pageId, refreshKey: taskDataVersion });
 
   const [groupBy, setGroupBy] = useState<GroupBy>('status');
   const [sortBy, setSortBy] = useState<SortBy>('created');
   const [sortAsc, setSortAsc] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
-  // Get column name by ID
-  const getColumnName = (columnId: string) => {
+  // Get column name by ID - memoized for useMemo dependencies
+  const getColumnName = useCallback((columnId: string) => {
     const column = columns.find((c) => c.id === columnId);
     return column?.title || 'Unknown';
-  };
+  }, [columns]);
 
   // Sort tasks
   const sortedTasks = useMemo(() => {
@@ -60,7 +64,7 @@ export function ListView({ pageId, onTaskClick }: ListViewProps) {
     });
 
     return sorted;
-  }, [tasks, sortBy, sortAsc, columns]);
+  }, [tasks, sortBy, sortAsc, getColumnName]);
 
   // Group tasks
   const groupedTasks = useMemo(() => {
@@ -106,7 +110,7 @@ export function ListView({ pageId, onTaskClick }: ListViewProps) {
     });
 
     return groups;
-  }, [sortedTasks, groupBy, columns]);
+  }, [sortedTasks, groupBy, getColumnName]);
 
   const toggleGroup = (group: string) => {
     setCollapsedGroups((prev) => {
@@ -130,23 +134,19 @@ export function ListView({ pageId, onTaskClick }: ListViewProps) {
   };
 
   if (columnsLoading || tasksLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 size={24} className="animate-spin text-[var(--color-text-tertiary)]" />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (
     <div className="flex h-full flex-col">
       {/* Toolbar */}
-      <div className="flex items-center gap-4 border-b border-[var(--color-border)] px-4 py-2">
+      <div className="flex items-center gap-4 border-b px-4 py-2">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-[var(--color-text-tertiary)]">Group by:</span>
+          <span className="text-xs text-muted-foreground">Group by:</span>
           <select
             value={groupBy}
             onChange={(e) => setGroupBy(e.target.value as GroupBy)}
-            className="rounded border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
+            className="rounded border bg-background px-2 py-1 text-xs"
           >
             <option value="none">None</option>
             <option value="status">Status</option>
@@ -159,22 +159,22 @@ export function ListView({ pageId, onTaskClick }: ListViewProps) {
       {/* Table */}
       <div className="flex-1 overflow-auto">
         <table className="w-full">
-          <thead className="sticky top-0 bg-[var(--color-bg-secondary)]">
-            <tr className="text-left text-xs text-[var(--color-text-tertiary)]">
+          <thead className="sticky top-0 bg-muted">
+            <tr className="text-left text-xs text-muted-foreground">
               <th
-                className="cursor-pointer px-4 py-2 font-medium hover:text-[var(--color-text-secondary)]"
+                className="cursor-pointer px-4 py-2 font-medium hover:text-foreground"
                 onClick={() => handleSort('title')}
               >
                 Title {sortBy === 'title' && (sortAsc ? '↑' : '↓')}
               </th>
               <th
-                className="cursor-pointer px-4 py-2 font-medium hover:text-[var(--color-text-secondary)]"
+                className="cursor-pointer px-4 py-2 font-medium hover:text-foreground"
                 onClick={() => handleSort('status')}
               >
                 Status {sortBy === 'status' && (sortAsc ? '↑' : '↓')}
               </th>
               <th
-                className="cursor-pointer px-4 py-2 font-medium hover:text-[var(--color-text-secondary)]"
+                className="cursor-pointer px-4 py-2 font-medium hover:text-foreground"
                 onClick={() => handleSort('dueDate')}
               >
                 Due Date {sortBy === 'dueDate' && (sortAsc ? '↑' : '↓')}
@@ -189,15 +189,15 @@ export function ListView({ pageId, onTaskClick }: ListViewProps) {
                   <td colSpan={3}>
                     <button
                       onClick={() => toggleGroup(group)}
-                      className="flex w-full items-center gap-2 bg-[var(--color-bg-tertiary)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)]"
+                      className="flex w-full items-center gap-2 bg-muted/50 px-4 py-2 text-sm font-medium"
                     >
                       {collapsedGroups.has(group) ? (
-                        <ChevronRight size={14} />
+                        <ChevronRight className="h-3.5 w-3.5" />
                       ) : (
-                        <ChevronDown size={14} />
+                        <ChevronDown className="h-3.5 w-3.5" />
                       )}
                       {group}
-                      <span className="text-xs text-[var(--color-text-tertiary)]">
+                      <span className="text-xs text-muted-foreground">
                         ({groupTasks.length})
                       </span>
                     </button>
@@ -209,7 +209,7 @@ export function ListView({ pageId, onTaskClick }: ListViewProps) {
                     <tr
                       key={task.id}
                       onClick={() => onTaskClick(task.id)}
-                      className="cursor-pointer border-b border-[var(--color-border)] hover:bg-[var(--color-bg-hover)]"
+                      className="cursor-pointer border-b hover:bg-accent/50"
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -219,15 +219,15 @@ export function ListView({ pageId, onTaskClick }: ListViewProps) {
                               style={{ backgroundColor: PRIORITY_COLORS[task.priority] }}
                             />
                           )}
-                          <span className="text-sm text-[var(--color-text-primary)]">
+                          <span className="text-sm">
                             {task.title || 'Untitled'}
                           </span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="rounded bg-[var(--color-bg-tertiary)] px-2 py-1 text-xs text-[var(--color-text-secondary)]">
+                        <Badge variant="secondary">
                           {getColumnName(task.column_id)}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-4 py-3">
                         {task.due_date ? (
@@ -235,14 +235,14 @@ export function ListView({ pageId, onTaskClick }: ListViewProps) {
                             className={cn(
                               'text-sm',
                               isOverdue(task.due_date)
-                                ? 'text-[var(--color-danger)]'
-                                : 'text-[var(--color-text-secondary)]'
+                                ? 'text-destructive'
+                                : 'text-muted-foreground'
                             )}
                           >
                             {formatDate(task.due_date)}
                           </span>
                         ) : (
-                          <span className="text-sm text-[var(--color-text-tertiary)]">-</span>
+                          <span className="text-sm text-muted-foreground">-</span>
                         )}
                       </td>
                     </tr>
@@ -253,7 +253,7 @@ export function ListView({ pageId, onTaskClick }: ListViewProps) {
         </table>
 
         {tasks.length === 0 && (
-          <div className="py-12 text-center text-sm text-[var(--color-text-tertiary)]">
+          <div className="py-12 text-center text-sm text-muted-foreground">
             No tasks yet
           </div>
         )}

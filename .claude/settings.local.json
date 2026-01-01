@@ -7,7 +7,17 @@
       "Bash(npm run dev:*)",
       "Bash(timeout:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx shadcn@latest init:*)",
+      "Bash(npx shadcn@latest add button dialog input dropdown-menu checkbox badge tooltip popover command scroll-area separator context-menu card -y)",
+      "Bash(cat:*)",
+      "Bash(npm run lint:*)",
+      "Bash(dir:*)"
     ]
   }
 }

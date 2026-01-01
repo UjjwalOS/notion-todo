@@ -15,12 +15,22 @@ import {
   SortableContext,
   horizontalListSortingStrategy,
 } from '@dnd-kit/sortable';
+import { toast } from 'sonner';
 import { useColumns, useTasks } from '@/hooks';
+import { useUIStore } from '@/stores';
 import { KanbanColumn } from './KanbanColumn';
 import { TaskCard } from './TaskCard';
 import { AddColumnButton } from './AddColumnButton';
-import type { Task, Column } from '@/types';
-import { Plus, Loader2 } from 'lucide-react';
+import type { Task } from '@/types';
+import { Plus } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui';
+import { Button } from '@/components/ui/button';
+
+// Type for tracking drop indicator position
+export interface DropIndicator {
+  columnId: string;
+  index: number;
+}
 
 interface KanbanBoardProps {
   pageId: string;
@@ -28,6 +38,8 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ pageId, onTaskClick }: KanbanBoardProps) {
+  const { taskDataVersion } = useUIStore();
+
   const {
     columns,
     isLoading: columnsLoading,
@@ -44,10 +56,10 @@ export function KanbanBoard({ pageId, onTaskClick }: KanbanBoardProps) {
     createTask,
     deleteTask,
     moveTask,
-  } = useTasks({ pageId });
+  } = useTasks({ pageId, refreshKey: taskDataVersion });
 
   const [activeTask, setActiveTask] = useState<Task | null>(null);
-  const [_activeColumn, setActiveColumn] = useState<Column | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -64,28 +76,50 @@ export function KanbanBoard({ pageId, onTaskClick }: KanbanBoardProps) {
 
     if (activeData?.type === 'task') {
       setActiveTask(activeData.task);
-    } else if (activeData?.type === 'column') {
-      setActiveColumn(activeData.column);
     }
+    // Note: Column dragging is handled by @dnd-kit/sortable automatically
   };
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
-    if (!over) return;
+
+    if (!over) {
+      setDropIndicator(null);
+      return;
+    }
 
     const activeData = active.data.current;
     const overData = over.data.current;
 
-    if (activeData?.type !== 'task') return;
+    if (activeData?.type !== 'task') {
+      setDropIndicator(null);
+      return;
+    }
 
-    const activeColumnId = activeData.task.column_id;
-    const overColumnId = overData?.type === 'column'
-      ? overData.column.id
-      : overData?.task?.column_id;
+    // Determine target column and position for drop indicator
+    let targetColumnId: string;
+    let targetIndex: number;
 
-    if (!overColumnId || activeColumnId === overColumnId) return;
+    if (overData?.type === 'task') {
+      targetColumnId = overData.task.column_id;
+      const columnTasks = tasksByColumn[targetColumnId] || [];
+      targetIndex = columnTasks.findIndex((t) => t.id === over.id);
 
-    // Move task to new column preview (handled in DragEnd for actual update)
+      // If dragging over self, hide indicator
+      if (active.id === over.id) {
+        setDropIndicator(null);
+        return;
+      }
+    } else if (overData?.type === 'column') {
+      targetColumnId = overData.column.id;
+      const columnTasks = tasksByColumn[targetColumnId] || [];
+      targetIndex = columnTasks.length; // Drop at end of column
+    } else {
+      setDropIndicator(null);
+      return;
+    }
+
+    setDropIndicator({ columnId: targetColumnId, index: targetIndex });
   };
 
   const handleDragEnd = useCallback(
@@ -93,7 +127,7 @@ export function KanbanBoard({ pageId, onTaskClick }: KanbanBoardProps) {
       const { active, over } = event;
 
       setActiveTask(null);
-      setActiveColumn(null);
+      setDropIndicator(null);
 
       if (!over) return;
 
@@ -140,15 +174,21 @@ export function KanbanBoard({ pageId, onTaskClick }: KanbanBoardProps) {
   );
 
   const handleCreateTask = async (columnId: string) => {
-    await createTask({
+    const result = await createTask({
       page_id: pageId,
       column_id: columnId,
       title: '',
     });
+    if (!result) {
+      toast.error('Failed to create task');
+    }
   };
 
   const handleUpdateColumnTitle = async (columnId: string, title: string) => {
-    await updateColumn({ id: columnId, title });
+    const success = await updateColumn({ id: columnId, title });
+    if (!success) {
+      toast.error('Failed to update column');
+    }
   };
 
   const handleDeleteColumn = async (columnId: string) => {
@@ -162,43 +202,41 @@ export function KanbanBoard({ pageId, onTaskClick }: KanbanBoardProps) {
         await deleteTask(task.id);
       }
     }
-    await deleteColumn(columnId);
+    const success = await deleteColumn(columnId);
+    if (success) {
+      toast.success('Column deleted');
+    } else {
+      toast.error('Failed to delete column');
+    }
   };
 
   const handleAddColumn = async () => {
-    await createColumn({ title: 'New Column' });
+    const result = await createColumn({ title: 'New Column' });
+    if (!result) {
+      toast.error('Failed to create column');
+    }
   };
 
   if (columnsLoading || tasksLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 size={24} className="animate-spin text-[var(--color-text-tertiary)]" />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   // If no columns, show option to create defaults
   if (columns.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
-        <p className="text-[var(--color-text-secondary)]">
+        <p className="text-muted-foreground">
           This page doesn't have any columns yet.
         </p>
         <div className="flex gap-3">
-          <button
-            onClick={createDefaultColumns}
-            className="flex items-center gap-2 rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm text-white hover:bg-[var(--color-accent-hover)]"
-          >
-            <Plus size={16} />
+          <Button onClick={createDefaultColumns}>
+            <Plus className="h-4 w-4" />
             Create Default Columns
-          </button>
-          <button
-            onClick={handleAddColumn}
-            className="flex items-center gap-2 rounded-md border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-          >
-            <Plus size={16} />
+          </Button>
+          <Button variant="outline" onClick={handleAddColumn}>
+            <Plus className="h-4 w-4" />
             Add Custom Column
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -227,6 +265,8 @@ export function KanbanBoard({ pageId, onTaskClick }: KanbanBoardProps) {
               onDelete={() => handleDeleteColumn(column.id)}
               onTaskClick={onTaskClick}
               onUpdateColumn={updateColumn}
+              dropIndicator={dropIndicator?.columnId === column.id ? dropIndicator : null}
+              isDragActive={activeTask !== null}
             />
           ))}
         </SortableContext>

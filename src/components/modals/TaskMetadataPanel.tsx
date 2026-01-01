@@ -3,6 +3,10 @@ import { formatDate } from '@/lib/utils';
 import { PRIORITY_LABELS, PRIORITY_COLORS } from '@/lib/utils';
 import type { Task, Priority, TaskUpdate } from '@/types';
 import { Calendar, Flag, Trash2, Clock, CheckCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Separator } from '@/components/ui/separator';
 
 interface TaskMetadataPanelProps {
   task: Task;
@@ -11,7 +15,7 @@ interface TaskMetadataPanelProps {
 }
 
 export function TaskMetadataPanel({ task, onUpdate, onDelete }: TaskMetadataPanelProps) {
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const handlePriorityChange = (priority: Priority) => {
     onUpdate({ priority });
@@ -20,117 +24,117 @@ export function TaskMetadataPanel({ task, onUpdate, onDelete }: TaskMetadataPane
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const date = e.target.value ? new Date(e.target.value).toISOString() : null;
     onUpdate({ due_date: date });
-    setShowDatePicker(false);
+    setDatePickerOpen(false);
   };
 
   const clearDueDate = () => {
     onUpdate({ due_date: null });
-    setShowDatePicker(false);
+    setDatePickerOpen(false);
   };
 
   return (
-    <div className="w-72 flex-shrink-0 overflow-y-auto bg-[var(--color-bg-secondary)] p-4">
-      <h3 className="mb-4 text-sm font-semibold text-[var(--color-text-primary)]">
+    <div className="w-72 flex-shrink-0 overflow-y-auto bg-muted/50 p-4">
+      <h3 className="mb-4 text-sm font-semibold">
         Details
       </h3>
 
       <div className="space-y-4">
         {/* Priority */}
         <div>
-          <label className="mb-2 flex items-center gap-2 text-xs font-medium text-[var(--color-text-secondary)]">
-            <Flag size={14} />
+          <label className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Flag className="h-3.5 w-3.5" />
             Priority
           </label>
           <div className="flex flex-wrap gap-1">
             {(['none', 'low', 'medium', 'high'] as Priority[]).map((priority) => (
-              <button
+              <Button
                 key={priority}
+                variant={task.priority === priority ? 'default' : 'secondary'}
+                size="sm"
                 onClick={() => handlePriorityChange(priority)}
-                className={`rounded px-2 py-1 text-xs transition-colors ${
-                  task.priority === priority
-                    ? 'bg-[var(--color-bg-hover)] text-[var(--color-text-primary)] ring-1 ring-[var(--color-accent)]'
-                    : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]'
-                }`}
+                className="h-7 gap-1.5 px-2 text-xs"
               >
                 {priority !== 'none' && (
                   <span
-                    className="mr-1 inline-block h-2 w-2 rounded-full"
+                    className="h-2 w-2 rounded-full"
                     style={{ backgroundColor: PRIORITY_COLORS[priority] }}
                   />
                 )}
                 {PRIORITY_LABELS[priority]}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
 
         {/* Due Date */}
         <div>
-          <label className="mb-2 flex items-center gap-2 text-xs font-medium text-[var(--color-text-secondary)]">
-            <Calendar size={14} />
+          <label className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Calendar className="h-3.5 w-3.5" />
             Due date
           </label>
-          <div className="relative">
-            <button
-              onClick={() => setShowDatePicker(!showDatePicker)}
-              className="w-full rounded bg-[var(--color-bg-tertiary)] px-3 py-2 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            >
-              {task.due_date ? formatDate(task.due_date) : 'No due date'}
-            </button>
-
-            {showDatePicker && (
-              <div className="absolute top-full z-10 mt-1 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-2 shadow-lg">
-                <input
-                  type="date"
-                  value={task.due_date ? task.due_date.split('T')[0] : ''}
-                  onChange={handleDateChange}
-                  className="mb-2 w-full rounded border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-2 py-1 text-sm"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={clearDueDate}
-                    className="flex-1 rounded bg-[var(--color-bg-tertiary)] px-2 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
-                  >
-                    Clear
-                  </button>
-                  <button
-                    onClick={() => setShowDatePicker(false)}
-                    className="flex-1 rounded bg-[var(--color-accent)] px-2 py-1 text-xs text-white hover:bg-[var(--color-accent-hover)]"
-                  >
-                    Done
-                  </button>
-                </div>
+          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left font-normal"
+              >
+                {task.due_date ? formatDate(task.due_date) : 'No due date'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-3" align="start">
+              <Input
+                type="date"
+                value={task.due_date ? task.due_date.split('T')[0] : ''}
+                onChange={handleDateChange}
+                className="mb-2"
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={clearDueDate}
+                  className="flex-1"
+                >
+                  Clear
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setDatePickerOpen(false)}
+                  className="flex-1"
+                >
+                  Done
+                </Button>
               </div>
-            )}
-          </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Timestamps */}
-        <div className="border-t border-[var(--color-border)] pt-4">
-          <div className="space-y-2 text-xs text-[var(--color-text-tertiary)]">
-            <div className="flex items-center gap-2">
-              <Clock size={12} />
-              <span>Created: {formatDate(task.created_at)}</span>
-            </div>
-            {task.completed_at && (
-              <div className="flex items-center gap-2 text-[var(--color-success)]">
-                <CheckCircle size={12} />
-                <span>Completed: {formatDate(task.completed_at)}</span>
-              </div>
-            )}
+        <Separator />
+        <div className="space-y-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Clock className="h-3 w-3" />
+            <span>Created: {formatDate(task.created_at)}</span>
           </div>
+          {task.completed_at && (
+            <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+              <CheckCircle className="h-3 w-3" />
+              <span>Completed: {formatDate(task.completed_at)}</span>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
-        <div className="border-t border-[var(--color-border)] pt-4">
-          <button
-            onClick={onDelete}
-            className="flex w-full items-center justify-center gap-2 rounded bg-[var(--color-danger)]/10 px-3 py-2 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger)]/20"
-          >
-            <Trash2 size={14} />
-            Move to trash
-          </button>
-        </div>
+        <Separator />
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={onDelete}
+          className="w-full"
+        >
+          <Trash2 className="h-4 w-4" />
+          Move to trash
+        </Button>
       </div>
     </div>
   );

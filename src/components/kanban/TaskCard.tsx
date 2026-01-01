@@ -2,7 +2,8 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn, formatDate, isOverdue, PRIORITY_COLORS } from '@/lib/utils';
 import type { Task } from '@/types';
-import { Calendar, GripVertical } from 'lucide-react';
+import { Calendar } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 
 interface TaskCardProps {
   task: Task;
@@ -76,70 +77,56 @@ export function TaskCard({ task, onClick, isDragging = false }: TaskCardProps) {
   const taskIsOverdue = task.due_date && isOverdue(task.due_date);
 
   return (
-    <div
+    <Card
       ref={setNodeRef}
       style={style}
+      {...attributes}
+      {...listeners}
       className={cn(
-        'group cursor-pointer rounded-md border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-3 shadow-sm transition-shadow hover:shadow-md',
-        showDragging && 'rotate-2 shadow-lg',
-        showDragging && 'opacity-90'
+        'group cursor-grab gap-0 rounded-lg p-3 transition-all hover:shadow-md active:cursor-grabbing',
+        showDragging && 'rotate-2 opacity-90 shadow-lg'
       )}
       onClick={onClick}
     >
-      {/* Drag handle and content */}
-      <div className="flex gap-2">
-        {/* Drag handle */}
-        <button
-          {...attributes}
-          {...listeners}
-          className="mt-0.5 flex-shrink-0 cursor-grab rounded p-0.5 text-[var(--color-text-tertiary)] opacity-0 hover:bg-[var(--color-bg-hover)] group-hover:opacity-100 active:cursor-grabbing"
-          onClick={(e) => e.stopPropagation()}
+      {/* Priority indicator */}
+      {task.priority !== 'none' && (
+        <div
+          className="mb-1.5 h-1 w-8 rounded-full"
+          style={{ backgroundColor: PRIORITY_COLORS[task.priority] }}
+        />
+      )}
+
+      {/* Title */}
+      <h4 className="text-sm font-medium">
+        {task.title || 'Untitled'}
+      </h4>
+
+      {/* Preview text */}
+      {previewText && (
+        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+          {previewText}
+        </p>
+      )}
+
+      {/* Image indicator */}
+      {taskHasImage && (
+        <div className="mt-2 h-16 rounded bg-muted" />
+      )}
+
+      {/* Due date */}
+      {task.due_date && (
+        <div
+          className={cn(
+            'mt-2 flex items-center gap-1 text-xs',
+            taskIsOverdue
+              ? 'text-destructive'
+              : 'text-muted-foreground'
+          )}
         >
-          <GripVertical size={14} />
-        </button>
-
-        <div className="min-w-0 flex-1">
-          {/* Priority indicator */}
-          {task.priority !== 'none' && (
-            <div
-              className="mb-1 h-1 w-8 rounded-full"
-              style={{ backgroundColor: PRIORITY_COLORS[task.priority] }}
-            />
-          )}
-
-          {/* Title */}
-          <h4 className="text-sm font-medium text-[var(--color-text-primary)]">
-            {task.title || 'Untitled'}
-          </h4>
-
-          {/* Preview text */}
-          {previewText && (
-            <p className="mt-1 line-clamp-2 text-xs text-[var(--color-text-secondary)]">
-              {previewText}
-            </p>
-          )}
-
-          {/* Image indicator */}
-          {taskHasImage && (
-            <div className="mt-2 h-16 rounded bg-[var(--color-bg-tertiary)]" />
-          )}
-
-          {/* Due date */}
-          {task.due_date && (
-            <div
-              className={cn(
-                'mt-2 flex items-center gap-1 text-xs',
-                taskIsOverdue
-                  ? 'text-[var(--color-danger)]'
-                  : 'text-[var(--color-text-tertiary)]'
-              )}
-            >
-              <Calendar size={12} />
-              {formatDate(task.due_date)}
-            </div>
-          )}
+          <Calendar className="h-3 w-3" />
+          {formatDate(task.due_date)}
         </div>
-      </div>
-    </div>
+      )}
+    </Card>
   );
 }

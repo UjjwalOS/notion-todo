@@ -5,7 +5,8 @@ import { useUIStore } from '@/stores';
 import { KanbanBoard, ListView } from '@/components/kanban';
 import { TaskModal } from '@/components/modals';
 import { cn } from '@/lib/utils';
-import { LayoutGrid, List, ChevronRight, Loader2 } from 'lucide-react';
+import { LayoutGrid, List, ChevronRight } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui';
 
 type ViewMode = 'kanban' | 'list';
 
@@ -57,11 +58,7 @@ export function PageView() {
   }, [isLoading, pageId, page, navigate]);
 
   if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 size={24} className="animate-spin text-[var(--color-text-tertiary)]" />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (!page || !pageId) {

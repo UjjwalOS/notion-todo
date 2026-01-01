@@ -6,8 +6,26 @@ import { useDroppable } from '@dnd-kit/core';
 import { TaskCard } from './TaskCard';
 import { cn } from '@/lib/utils';
 import type { Column, Task, ColumnUpdate } from '@/types';
+import type { DropIndicator } from './KanbanBoard';
 import { Plus, MoreHorizontal, GripVertical, Pencil, Trash2, Palette } from 'lucide-react';
 import { COLUMN_COLORS } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+// Drop indicator line component
+function DropIndicatorLine() {
+  return (
+    <div className="drop-indicator mx-1 my-1 h-1 rounded-full bg-primary" />
+  );
+}
 
 interface KanbanColumnProps {
   column: Column;
@@ -17,6 +35,8 @@ interface KanbanColumnProps {
   onDelete: () => void;
   onTaskClick: (taskId: string) => void;
   onUpdateColumn: (data: ColumnUpdate) => void;
+  dropIndicator: DropIndicator | null;
+  isDragActive: boolean;
 }
 
 export function KanbanColumn({
@@ -27,10 +47,11 @@ export function KanbanColumn({
   onDelete,
   onTaskClick,
   onUpdateColumn,
+  dropIndicator,
+  isDragActive,
 }: KanbanColumnProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(column.title);
-  const [showMenu, setShowMenu] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   const {
@@ -73,16 +94,19 @@ export function KanbanColumn({
   const handleColorChange = (color: string) => {
     onUpdateColumn({ id: column.id, color });
     setShowColorPicker(false);
-    setShowMenu(false);
   };
+
+  // Check if this column is the current drop target
+  const isDropTarget = dropIndicator !== null;
 
   return (
     <div
       ref={setSortableRef}
       style={style}
       className={cn(
-        'flex h-full w-72 flex-shrink-0 flex-col rounded-lg bg-[var(--color-bg-secondary)]',
-        isDragging && 'opacity-50'
+        'flex h-full w-72 flex-shrink-0 flex-col rounded-lg bg-muted/50 transition-colors duration-200',
+        isDragging && 'opacity-50',
+        isDragActive && isDropTarget && 'ring-2 ring-primary/50 bg-primary/5'
       )}
     >
       {/* Column Header */}
@@ -94,9 +118,9 @@ export function KanbanColumn({
         <button
           {...attributes}
           {...listeners}
-          className="cursor-grab rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)] active:cursor-grabbing"
+          className="cursor-grab rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground active:cursor-grabbing"
         >
-          <GripVertical size={14} />
+          <GripVertical className="h-3.5 w-3.5" />
         </button>
 
         {/* Icon */}
@@ -104,7 +128,7 @@ export function KanbanColumn({
 
         {/* Title */}
         {isEditing ? (
-          <input
+          <Input
             type="text"
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
@@ -116,12 +140,12 @@ export function KanbanColumn({
                 setIsEditing(false);
               }
             }}
-            className="flex-1 rounded bg-transparent px-1 text-sm font-medium text-[var(--color-text-primary)] outline-none ring-1 ring-[var(--color-accent)]"
+            className="h-7 flex-1 px-2 text-sm font-medium"
             autoFocus
           />
         ) : (
           <span
-            className="flex-1 cursor-pointer text-sm font-medium text-[var(--color-text-primary)]"
+            className="flex-1 cursor-pointer text-sm font-medium"
             onClick={() => setIsEditing(true)}
           >
             {column.title}
@@ -129,81 +153,64 @@ export function KanbanColumn({
         )}
 
         {/* Task count */}
-        <span className="rounded bg-[var(--color-bg-tertiary)] px-1.5 py-0.5 text-xs text-[var(--color-text-tertiary)]">
+        <Badge variant="secondary" className="text-xs">
           {tasks.length}
-        </span>
+        </Badge>
 
         {/* Menu */}
-        <div className="relative">
-          <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]"
-          >
-            <MoreHorizontal size={14} />
-          </button>
-
-          {showMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-primary)] py-1 shadow-lg">
-                <button
-                  onClick={() => {
-                    setIsEditing(true);
-                    setShowMenu(false);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-                >
-                  <Pencil size={14} />
-                  Rename
-                </button>
-                <button
-                  onClick={() => setShowColorPicker(!showColorPicker)}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-                >
-                  <Palette size={14} />
-                  Change color
-                </button>
-                {showColorPicker && (
-                  <div className="flex flex-wrap gap-1 px-3 py-2">
-                    {COLUMN_COLORS.map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => handleColorChange(color)}
-                        className={cn(
-                          'h-5 w-5 rounded border-2',
-                          color === column.color
-                            ? 'border-[var(--color-accent)]'
-                            : 'border-transparent'
-                        )}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
-                )}
-                <div className="my-1 border-t border-[var(--color-border)]" />
-                <button
-                  onClick={() => {
-                    onDelete();
-                    setShowMenu(false);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--color-danger)] hover:bg-[var(--color-bg-hover)]"
-                >
-                  <Trash2 size={14} />
-                  Delete
-                </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="h-7 w-7">
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => setIsEditing(true)}>
+              <Pencil className="h-4 w-4" />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowColorPicker(!showColorPicker)}>
+              <Palette className="h-4 w-4" />
+              Change color
+            </DropdownMenuItem>
+            {showColorPicker && (
+              <div className="flex flex-wrap gap-1 px-2 py-2">
+                {COLUMN_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => handleColorChange(color)}
+                    className={cn(
+                      'h-5 w-5 rounded border-2',
+                      color === column.color
+                        ? 'border-primary'
+                        : 'border-transparent'
+                    )}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
               </div>
-            </>
-          )}
-        </div>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={onDelete}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Add task button */}
-        <button
+        <Button
+          variant="ghost"
+          size="icon-sm"
           onClick={onCreateTask}
-          className="rounded p-1 text-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]"
+          className="h-7 w-7"
           title="Add task"
         >
-          <Plus size={14} />
-        </button>
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
       </div>
 
       {/* Task list */}
@@ -216,18 +223,23 @@ export function KanbanColumn({
           strategy={verticalListSortingStrategy}
         >
           {tasks.length === 0 ? (
-            <div className="py-8 text-center text-sm text-[var(--color-text-tertiary)]">
-              No tasks
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              {isDropTarget ? <DropIndicatorLine /> : 'No tasks'}
             </div>
           ) : (
             <div className="space-y-2">
-              {tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onClick={() => onTaskClick(task.id)}
-                />
+              {tasks.map((task, index) => (
+                <div key={task.id}>
+                  {/* Show drop indicator before this task */}
+                  {dropIndicator?.index === index && <DropIndicatorLine />}
+                  <TaskCard
+                    task={task}
+                    onClick={() => onTaskClick(task.id)}
+                  />
+                </div>
               ))}
+              {/* Show drop indicator at the end if dropping after last task */}
+              {dropIndicator?.index === tasks.length && <DropIndicatorLine />}
             </div>
           )}
         </SortableContext>

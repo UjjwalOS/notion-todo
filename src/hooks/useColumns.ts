@@ -115,19 +115,19 @@ export function useColumns(pageId: string | null) {
       const [removed] = newColumns.splice(currentIndex, 1);
       newColumns.splice(newPosition, 0, removed);
 
-      // Update positions
+      // Prepare batch update payload - include page_id as required by upsert
       const updates = newColumns.map((col, index) => ({
         id: col.id,
+        page_id: col.page_id,
         position: index,
       }));
 
-      // Batch update in database
-      for (const update of updates) {
-        await supabase
-          .from('columns')
-          .update({ position: update.position })
-          .eq('id', update.id);
-      }
+      // Single batch upsert instead of N individual updates
+      const { error: updateError } = await supabase
+        .from('columns')
+        .upsert(updates, { onConflict: 'id' });
+
+      if (updateError) throw updateError;
 
       setColumns(newColumns.map((col, index) => ({ ...col, position: index })));
       return true;

@@ -177,31 +177,42 @@ export function usePages() {
     newParentId: string | null,
     newPosition: number
   ): Promise<boolean> => {
+    if (!user) return false;
+
     try {
       // Get siblings at the new location
       const siblings = pages.filter(
         (p) => p.parent_id === newParentId && p.id !== pageId
       );
 
-      // Update positions
-      const updates: { id: string; position: number; parent_id: string | null }[] = [];
+      // Build updates array with required fields for upsert
+      const updates: { id: string; user_id: string; position: number; parent_id: string | null }[] = [];
 
       siblings.forEach((sibling, index) => {
         const newPos = index >= newPosition ? index + 1 : index;
         if (sibling.position !== newPos) {
-          updates.push({ id: sibling.id, position: newPos, parent_id: newParentId });
+          updates.push({
+            id: sibling.id,
+            user_id: user.id,
+            position: newPos,
+            parent_id: newParentId
+          });
         }
       });
 
-      updates.push({ id: pageId, position: newPosition, parent_id: newParentId });
+      updates.push({
+        id: pageId,
+        user_id: user.id,
+        position: newPosition,
+        parent_id: newParentId
+      });
 
-      // Batch update
-      for (const update of updates) {
-        await supabase
-          .from('pages')
-          .update({ position: update.position, parent_id: update.parent_id })
-          .eq('id', update.id);
-      }
+      // Single batch upsert instead of N individual updates
+      const { error: updateError } = await supabase
+        .from('pages')
+        .upsert(updates, { onConflict: 'id' });
+
+      if (updateError) throw updateError;
 
       // Update local state
       setPages((prev) =>
