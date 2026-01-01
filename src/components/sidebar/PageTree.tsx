@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { usePages } from '@/hooks';
 import { PageTreeItem } from './PageTreeItem';
+import { ConfirmDialog } from '@/components/ui';
 import type { PageWithChildren } from '@/types';
 import { Plus, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface RenameModalProps {
   page: PageWithChildren;
@@ -77,6 +79,11 @@ function RenameModal({ page, onClose, onSave }: RenameModalProps) {
 export function PageTree() {
   const { pageTree, isLoading, createPage, updatePage, deletePage } = usePages();
   const [renamingPage, setRenamingPage] = useState<PageWithChildren | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    page: PageWithChildren | null;
+    hasContent: boolean;
+  }>({ isOpen: false, page: null, hasContent: false });
 
   const handleCreatePage = async (parentId?: string | null) => {
     const result = await createPage({
@@ -95,15 +102,49 @@ export function PageTree() {
     }
   };
 
-  const handleDelete = async (page: PageWithChildren) => {
-    if (confirm(`Are you sure you want to delete "${page.title}"? This will also delete all subpages.`)) {
-      const success = await deletePage(page.id);
-      if (success) {
-        toast.success('Page deleted');
-      } else {
-        toast.error('Failed to delete page');
-      }
+  // Check if a page has any content (tasks or subpages)
+  const checkPageHasContent = async (page: PageWithChildren): Promise<boolean> => {
+    // Check for subpages (already in memory)
+    if (page.children && page.children.length > 0) {
+      return true;
     }
+
+    // Check for tasks in database (quick count query)
+    const { count, error } = await supabase
+      .from('tasks')
+      .select('*', { count: 'exact', head: true })
+      .eq('page_id', page.id)
+      .eq('is_deleted', false);
+
+    if (error) {
+      console.error('Error checking page content:', error);
+      return true; // Assume has content on error to be safe
+    }
+
+    return (count ?? 0) > 0;
+  };
+
+  const handleDelete = async (page: PageWithChildren) => {
+    // Check if page has content
+    const hasContent = await checkPageHasContent(page);
+
+    if (hasContent) {
+      // Show confirmation dialog
+      setDeleteConfirmation({ isOpen: true, page, hasContent: true });
+    } else {
+      // Delete directly without confirmation
+      await executeDelete(page);
+    }
+  };
+
+  const executeDelete = async (page: PageWithChildren) => {
+    const success = await deletePage(page.id);
+    if (success) {
+      toast.success('Page deleted');
+    } else {
+      toast.error('Failed to delete page');
+    }
+    setDeleteConfirmation({ isOpen: false, page: null, hasContent: false });
   };
 
   const handleDuplicate = async (page: PageWithChildren) => {
@@ -169,6 +210,27 @@ export function PageTree() {
           onSave={handleRename}
         />
       )}
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDialog
+        open={deleteConfirmation.isOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteConfirmation({ isOpen: false, page: null, hasContent: false });
+          }
+        }}
+        title={`Delete "${deleteConfirmation.page?.title || 'page'}"?`}
+        description={
+          deleteConfirmation.page?.children && deleteConfirmation.page.children.length > 0
+            ? 'This page has subpages. Deleting it will also delete all subpages and their content.'
+            : 'This page has content. Deleting it will permanently remove all tasks and data.'
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={() => deleteConfirmation.page && executeDelete(deleteConfirmation.page)}
+        onCancel={() => setDeleteConfirmation({ isOpen: false, page: null, hasContent: false })}
+      />
     </div>
   );
 }
